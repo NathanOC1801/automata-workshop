@@ -8,6 +8,7 @@ local EconomyService = require(script.Parent.EconomyService)
 local PlacementService = require(script.Parent.PlacementService)
 local GridService = require(script.Parent.GridService)
 local ProgressionService = require(script.Parent.ProgressionService)
+local MonetizationService = require(script.Parent.MonetizationService)
 
 type SavedObjectData = {
 	coord: { X: number, Y: number, Z: number },
@@ -19,6 +20,8 @@ type PlayerSaveData = {
 	credits: number,
 	unlockedTier: number?,
 	sunkItems: { [string]: number }?,
+	unlockedPlanets: { string }?,
+	overclockExpiresAt: number?,
 	placedObjects: { SavedObjectData },
 }
 
@@ -34,6 +37,8 @@ function SaveService.SavePlayerData(player: Player)
 	local credits = EconomyService.GetCredits(player)
 	local unlockedTier = ProgressionService.GetUnlockedTier(player)
 	local sunkItems = ProgressionService.GetSunkItems(player)
+	local unlockedPlanets = ProgressionService.GetUnlockedPlanets(player)
+	local overclockExpiresAt = MonetizationService.GetOverclockExpiresAt(player)
 	local placedObjects: { SavedObjectData } = {}
 
 	local placedFolder = Workspace:FindFirstChild("PlacedObjects")
@@ -68,6 +73,8 @@ function SaveService.SavePlayerData(player: Player)
 		credits = credits,
 		unlockedTier = unlockedTier,
 		sunkItems = sunkItems,
+		unlockedPlanets = unlockedPlanets,
+		overclockExpiresAt = overclockExpiresAt,
 		placedObjects = placedObjects,
 	}
 
@@ -97,7 +104,11 @@ function SaveService.LoadPlayerData(player: Player)
 		end
 
 		if typeof(data.unlockedTier) == "number" then
-			ProgressionService.SetProgression(player, data.unlockedTier, data.sunkItems)
+			ProgressionService.SetProgression(player, data.unlockedTier, data.sunkItems, data.unlockedPlanets)
+		end
+
+		if typeof(data.overclockExpiresAt) == "number" then
+			MonetizationService.SetOverclockExpiresAt(player, data.overclockExpiresAt)
 		end
 
 		if typeof(data.placedObjects) == "table" then
