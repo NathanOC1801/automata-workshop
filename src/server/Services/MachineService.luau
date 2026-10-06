@@ -6,19 +6,16 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Types = require(ReplicatedStorage.Shared.Types)
 local Recipes = require(ReplicatedStorage.Shared.Config.Recipes)
-local Items = require(ReplicatedStorage.Shared.Config.Items)
 local GridService = require(script.Parent.GridService)
 local ConveyorService = require(script.Parent.ConveyorService)
 local EconomyService = require(script.Parent.EconomyService)
 local ProgressionService = require(script.Parent.ProgressionService)
-local MonetizationService = require(script.Parent.MonetizationService)
 local Network = require(ReplicatedStorage.Shared.Network)
 
 export type MachineInstance = {
 	coord: Vector3int16,
 	category: Types.MachineCategory,
 	orientation: number,
-	ownerUserId: number?,
 	timer: number,
 	recipe: Types.Recipe?,
 	selectedRecipeId: string?,
@@ -77,13 +74,12 @@ function MachineService.GetRightOffset(orientation: number): Vector3int16
 	return Vector3int16.new(-left.X, -left.Y, -left.Z)
 end
 
-function MachineService.CreateMachine(coord: Vector3int16, category: Types.MachineCategory, orientation: number, ownerUserId: number?): MachineInstance
+function MachineService.CreateMachine(coord: Vector3int16, category: Types.MachineCategory, orientation: number): MachineInstance
 	local key = coordToKey(coord)
 	local machine: MachineInstance = {
 		coord = coord,
 		category = category,
 		orientation = orientation,
-		ownerUserId = ownerUserId,
 		timer = 0,
 		recipe = nil,
 		selectedRecipeId = nil,
@@ -187,34 +183,18 @@ function MachineService.StepMachines(dt: number)
 			machine.coord.Z + rightOffset.Z
 		)
 
-		local ownerPlayer = machine.ownerUserId and Players:GetPlayerByUserId(machine.ownerUserId) or nil
-		local machineSpeedMult = MonetizationService.GetPlayerMachineSpeedMultiplier(ownerPlayer)
-
 		if machine.category == "Drill" then
 			local deposit = GridService.GetDepositAt(machine.coord)
 			if deposit == "Iron" then
 				machine.selectedResource = "RawIron"
 			elseif deposit == "Copper" then
 				machine.selectedResource = "RawCopper"
-			elseif deposit == "Titanium" then
-				machine.selectedResource = "RawTitanium"
-			elseif deposit == "Cobalt" then
-				machine.selectedResource = "RawCobalt"
-			elseif deposit == "Gold" then
-				machine.selectedResource = "RawGold"
-			elseif deposit == "Emerald" then
-				machine.selectedResource = "RawEmerald"
-			elseif deposit == "Diamond" then
-				machine.selectedResource = "RawDiamond"
-			elseif deposit == "Uranium" then
-				machine.selectedResource = "RawUranium"
 			else
 				machine.selectedResource = nil
 			end
 
 			if machine.selectedResource ~= nil then
-				local miningMult = MonetizationService.GetPlayerMiningMultiplier(ownerPlayer)
-				machine.timer += dt * miningMult
+				machine.timer += dt
 				if machine.timer >= 2.0 then
 					local frontConveyor = ConveyorService.GetConveyor(frontCoord)
 					if frontConveyor then
@@ -247,7 +227,7 @@ function MachineService.StepMachines(dt: number)
 			-- Crafting state
 			if machine.recipe ~= nil then
 				setSmelterVisualState(machine.coord, machine.category, true)
-				machine.timer += dt * machineSpeedMult
+				machine.timer += dt
 				if machine.timer >= machine.recipe.craftDuration then
 					local outputItem: string? = nil
 					for itemId, count in pairs(machine.recipe.outputs) do
@@ -309,7 +289,7 @@ function MachineService.StepMachines(dt: number)
 
 			-- Check active crafting or select recipe
 			if machine.recipe ~= nil then
-				machine.timer += dt * machineSpeedMult
+				machine.timer += dt
 				if machine.timer >= machine.recipe.craftDuration then
 					local outputItem: string? = nil
 					for itemId, count in pairs(machine.recipe.outputs) do
@@ -465,12 +445,10 @@ function MachineService.StepMachines(dt: number)
 					local consumedItem = slot4.itemId
 					slot4.itemId = nil
 					slot4.progress = 0.0
-					local itemData = Items[consumedItem]
-					local payout = itemData and itemData.baseValue or 10
-					print(string.format("[Sink] Consumed %s for +$%d Credits at (%d, %d, %d)", consumedItem, payout, machine.coord.X, machine.coord.Y, machine.coord.Z))
+					print(string.format("[Sink] Consumed %s for +10 Credits at (%d, %d, %d)", consumedItem, machine.coord.X, machine.coord.Y, machine.coord.Z))
 
 					for _, player in ipairs(Players:GetPlayers()) do
-						EconomyService.AddCredits(player, payout)
+						EconomyService.AddCredits(player, 10)
 						ProgressionService.ProcessSinkConsumption(player, consumedItem)
 					end
 				end

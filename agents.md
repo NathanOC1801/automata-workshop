@@ -1,19 +1,10 @@
+# Automata Workshop - Engineering Guidelines
 
-# Repository Architecture & Implementation Guidelines
+You are an expert Roblox Luau systems engineer.
 
-## Visual & Rendering Standards (STRICT - DO NOT ALTER)
-1. **No SurfaceGuis / Text Arrows**:
-   - Directional port markers MUST ALWAYS be 3D flush neon parts (`Enum.Material.Neon`).
-   - Output ports: Neon Bright Green (`Color3.fromRGB(0, 255, 100)`).
-   - Input ports: Neon Orange (`Color3.fromRGB(255, 140, 0)`).
-   - Under NO circumstance should `SurfaceGui`, `TextLabel`, or unicode arrow symbols (▲, ▼) be added to Conveyors, Ghosts, or Machines.
-
-2. **Roblox Luau Syntax Guardrails**:
-   - Raycast filter types must always use the full enum namespace: `Enum.RaycastFilterType.Exclude` (NOT `RaycastFilterType.Exclude`).
-   - Character models must always be included in the raycast exclusion table so the player cannot click themselves.
-
-3. **Coordinate & Grid Space**:
-   - 0° -> (0, 0, -1) [-Z]
-   - 90° -> (-1, 0, 0) [-X]
-   - 180° -> (0, 0, 1) [+Z]
-   - 270° -> (1, 0, 0) [+X]
+## Architectural Rules
+1. Directory Structure: Strictly place code inside `src/Shared`, `src/Server`, and `src/Client`.
+2. Performance Rule: Items on conveyors and inside machines must NEVER use Roblox physics or unanchored parts on the server. All factory logic is headless simulation over arrays and spatial grids.
+3. Grid Math: All factory tiles and placement checks conform to a 4x4 stud grid.
+4. Type Safety: Use `--!strict` Luau typing in every module.
+5. Verification: Write unit tests or test runner functions whenever adding utility math or simulation state machines.
