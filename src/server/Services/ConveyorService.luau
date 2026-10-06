@@ -2,12 +2,20 @@
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Types = require(ReplicatedStorage.Shared.Types)
+local Network = require(ReplicatedStorage.Shared.Network)
 local GridService = require(script.Parent.GridService)
 
 export type ConveyorCell = {
 	coord: Vector3int16,
 	orientation: number, -- 0, 90, 180, 270
 	slots: { Types.ConveyorSlot },
+}
+
+export type ConveyorItemSyncPayload = {
+	coord: Vector3int16,
+	slotIndex: number,
+	itemId: string,
+	orientation: number,
 }
 
 local ConveyorService = {}
@@ -71,23 +79,8 @@ function ConveyorService.RemoveConveyor(coord: Vector3int16)
 end
 
 function ConveyorService.StepConveyors(dt: number)
-	-- Phase 1: Internal slot advances within each conveyor (slots 3 down to 1)
-	for _, conveyor in pairs(conveyors) do
-		for s = 3, 1, -1 do
-			local currentSlot = conveyor.slots[s]
-			local nextSlot = conveyor.slots[s + 1]
-			if currentSlot.itemId ~= nil and nextSlot.itemId == nil then
-				nextSlot.itemId = currentSlot.itemId
-				nextSlot.progress = 1.0
-				currentSlot.itemId = nil
-				currentSlot.progress = 0.0
-			end
-		end
-	end
-
-	-- Phase 2: Inter-conveyor transfers (Slot 4 -> Target Conveyor Slot 1)
-	-- Running transfers AFTER internal slot advances prevents items transferred into Slot 1
-	-- from double-stepping into Slot 2 during the same tick!
+	-- Phase 1: Inter-conveyor transfers (Slot 4 -> Target Conveyor Slot 1)
+	-- Process transfers first so Slot 4 empties, allowing internal slots to advance into Slot 4 cleanly.
 	for _, conveyor in pairs(conveyors) do
 		local slot4 = conveyor.slots[4]
 		if slot4.itemId ~= nil then
@@ -109,6 +102,37 @@ function ConveyorService.StepConveyors(dt: number)
 			end
 		end
 	end
+
+	-- Phase 2: Internal slot advances within each conveyor (slots 3 down to 1)
+	for _, conveyor in pairs(conveyors) do
+		for s = 3, 1, -1 do
+			local currentSlot = conveyor.slots[s]
+			local nextSlot = conveyor.slots[s + 1]
+			if currentSlot.itemId ~= nil and nextSlot.itemId == nil then
+				nextSlot.itemId = currentSlot.itemId
+				nextSlot.progress = 1.0
+				currentSlot.itemId = nil
+				currentSlot.progress = 0.0
+			end
+		end
+	end
+
+	-- Collect occupied slots across all conveyors to send to clients
+	local syncData: { ConveyorItemSyncPayload } = {}
+	for _, conveyor in pairs(conveyors) do
+		for _, slot in ipairs(conveyor.slots) do
+			if slot.itemId ~= nil then
+				table.insert(syncData, {
+					coord = conveyor.coord,
+					slotIndex = slot.slotIndex,
+					itemId = slot.itemId,
+					orientation = conveyor.orientation,
+				})
+			end
+		end
+	end
+
+	Network.Remotes.SyncConveyorItems:FireAllClients(syncData)
 end
 
 return ConveyorService

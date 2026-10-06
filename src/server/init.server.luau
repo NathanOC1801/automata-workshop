@@ -21,38 +21,23 @@ local c1 = ConveyorService.CreateConveyor(c1Coord, 90)
 ConveyorService.CreateConveyor(c2Coord, 90)
 ConveyorService.CreateConveyor(c3Coord, 90)
 
--- Insert an initial item into Slot 1 of C1
-c1.slots[1].itemId = "RawIron"
-c1.slots[1].progress = 1.0
-
 print("[Server] Initialized PlacementService and 3-node conveyor chain test.")
 
-local tickCount = 0
-local MAX_TEST_TICKS = 15
+local spawnToggle = false
 
 RunService.Heartbeat:Connect(function(dt: number)
 	accumulator += dt
 	while accumulator >= TICK_INTERVAL do
 		accumulator -= TICK_INTERVAL
-		tickCount += 1
+
+		-- Continuous spawner: if C1 Slot 1 is empty, insert alternating test item
+		if c1.slots[1].itemId == nil then
+			spawnToggle = not spawnToggle
+			local newItemId = spawnToggle and "RawIron" or "RawCopper"
+			c1.slots[1].itemId = newItemId
+			c1.slots[1].progress = 1.0
+		end
 
 		ConveyorService.StepConveyors(TICK_INTERVAL)
-
-		if tickCount <= MAX_TEST_TICKS then
-			-- Find current item position for logging
-			local foundPos = "None"
-			for _, coord in ipairs({ c1Coord, c2Coord, c3Coord }) do
-				local conv = ConveyorService.GetConveyor(coord)
-				if conv then
-					for _, slot in ipairs(conv.slots) do
-						if slot.itemId then
-							foundPos = string.format("Cell (%d,%d,%d) Slot %d", coord.X, coord.Y, coord.Z, slot.slotIndex)
-							break
-						end
-					end
-				end
-			end
-			print(string.format("[Conveyor Test - Tick %02d] Item Location: %s", tickCount, foundPos))
-		end
 	end
 end)
