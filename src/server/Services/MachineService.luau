@@ -1,5 +1,6 @@
 --!strict
 
+local Workspace = game:GetService("Workspace")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Types = require(ReplicatedStorage.Shared.Types)
@@ -84,6 +85,20 @@ local function findMatchingRecipe(inputId: string): Types.Recipe?
 	return nil
 end
 
+local function setSmelterLightBrightness(coord: Vector3int16, category: string, brightness: number)
+	local placedFolder = Workspace:FindFirstChild("PlacedObjects")
+	if placedFolder then
+		local partName = string.format("%s_%d_%d_%d", category, coord.X, coord.Y, coord.Z)
+		local part = placedFolder:FindFirstChild(partName)
+		if part then
+			local light = part:FindFirstChild("FurnaceLight")
+			if light and light:IsA("PointLight") then
+				light.Brightness = brightness
+			end
+		end
+	end
+end
+
 function MachineService.StepMachines(dt: number)
 	for _, machine in pairs(machines) do
 		local fwdOffset = MachineService.GetForwardOffset(machine.orientation)
@@ -91,6 +106,12 @@ function MachineService.StepMachines(dt: number)
 			machine.coord.X + fwdOffset.X,
 			machine.coord.Y + fwdOffset.Y,
 			machine.coord.Z + fwdOffset.Z
+		)
+		local behindOffset = MachineService.GetBehindOffset(machine.orientation)
+		local behindCoord = Vector3int16.new(
+			machine.coord.X + behindOffset.X,
+			machine.coord.Y + behindOffset.Y,
+			machine.coord.Z + behindOffset.Z
 		)
 
 		if machine.category == "Drill" then
@@ -105,15 +126,7 @@ function MachineService.StepMachines(dt: number)
 						slot1.progress = 1.0
 						machine.timer = 0
 						print(string.format("[Drill Debug] Ejected RawIron into Conveyor at (%d, %d, %d)", frontCoord.X, frontCoord.Y, frontCoord.Z))
-					else
-						-- Slot 1 is blocked/occupied
 					end
-				else
-					print(string.format("[Drill Debug] Waiting... No conveyor found at frontCoord: (%d, %d, %d). Drill is at (%d, %d, %d) rot: %d", 
-						frontCoord.X, frontCoord.Y, frontCoord.Z, 
-						machine.coord.X, machine.coord.Y, machine.coord.Z, 
-						machine.orientation
-					))
 				end
 			end
 
@@ -133,9 +146,9 @@ function MachineService.StepMachines(dt: number)
 
 			-- If actively crafting
 			if machine.recipe ~= nil then
+				setSmelterLightBrightness(machine.coord, machine.category, 3)
 				machine.timer += dt
 				if machine.timer >= machine.recipe.craftDuration then
-					-- Finished craft! Get output item
 					local outputItem: string? = nil
 					for itemId, count in pairs(machine.recipe.outputs) do
 						outputItem = itemId
@@ -144,28 +157,37 @@ function MachineService.StepMachines(dt: number)
 					machine.outputBuffer = outputItem
 					machine.recipe = nil
 					machine.timer = 0
+					setSmelterLightBrightness(machine.coord, machine.category, 0)
 				end
 			-- If idle and outputBuffer is clear, attempt to pull input from Behind conveyor's Slot 4
 			elseif machine.outputBuffer == nil then
-				local behindOffset = MachineService.GetBehindOffset(machine.orientation)
-				local behindCoord = Vector3int16.new(
-					machine.coord.X + behindOffset.X,
-					machine.coord.Y + behindOffset.Y,
-					machine.coord.Z + behindOffset.Z
-				)
+				setSmelterLightBrightness(machine.coord, machine.category, 0)
 				local behindConveyor = ConveyorService.GetConveyor(behindCoord)
 				if behindConveyor then
 					local slot4 = behindConveyor.slots[4]
 					if slot4.itemId ~= nil then
 						local matchingRecipe = findMatchingRecipe(slot4.itemId)
 						if matchingRecipe and matchingRecipe.machineType == "Smelter" then
-							-- Pull input item and start crafting
 							slot4.itemId = nil
 							slot4.progress = 0.0
 							machine.recipe = matchingRecipe
 							machine.timer = 0
+							setSmelterLightBrightness(machine.coord, machine.category, 3)
 						end
 					end
+				end
+			end
+
+		elseif machine.category == "Sink" then
+			-- Item Sink: Pull items from Behind conveyor's Slot 4 and consume them for credits
+			local behindConveyor = ConveyorService.GetConveyor(behindCoord)
+			if behindConveyor then
+				local slot4 = behindConveyor.slots[4]
+				if slot4.itemId ~= nil then
+					local consumedItem = slot4.itemId
+					slot4.itemId = nil
+					slot4.progress = 0.0
+					print(string.format("[Sink] Consumed %s for +10 Credits at (%d, %d, %d)", consumedItem, machine.coord.X, machine.coord.Y, machine.coord.Z))
 				end
 			end
 		end

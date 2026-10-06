@@ -20,7 +20,6 @@ local selectedCategory: Types.MachineCategory = "Conveyor"
 local orientation = 0 -- 0, 90, 180, 270
 
 local ghostPart: Part? = nil
-local surfaceGui: SurfaceGui? = nil
 local currentGridCoord: Vector3int16? = nil
 local isCellVacant = true
 
@@ -69,6 +68,9 @@ local function updateGhostAppearance()
 	elseif selectedCategory == "Smelter" then
 		createGhostPort(ghostPart, "OutputPort", Vector3.new(0, 0, -2.05), Color3.fromRGB(0, 255, 100))
 		createGhostPort(ghostPart, "InputPort", Vector3.new(0, 0, 2.05), Color3.fromRGB(255, 140, 0))
+	elseif selectedCategory == "Sink" then
+		-- Sink only receives items: Input Port on the receiving side (+Z)
+		createGhostPort(ghostPart, "InputPort", Vector3.new(0, 0, 2.05), Color3.fromRGB(255, 140, 0))
 	end
 end
 
@@ -96,7 +98,6 @@ local function destroyGhostPart()
 	if ghostPart then
 		ghostPart:Destroy()
 		ghostPart = nil
-		surfaceGui = nil
 	end
 end
 
@@ -120,7 +121,7 @@ function PlacementController.TogglePlacementMode()
 	isPlacementActive = not isPlacementActive
 	if isPlacementActive then
 		createGhostPart()
-		print("[PlacementController] Placement mode enabled. Keys 1=Conveyor, 2=Drill, 3=Smelter. 'R' rotate, 'E' toggle.")
+		print("[PlacementController] Placement mode enabled. Keys 1=Conveyor, 2=Drill, 3=Smelter, 4=Sink. Right-Click/X=Demolish. 'R'=Rotate, 'E'=Toggle.")
 	else
 		destroyGhostPart()
 		print("[PlacementController] Placement mode disabled.")
@@ -157,9 +158,15 @@ function PlacementController.OnInputBegan(input: InputObject, gameProcessed: boo
 		PlacementController.SelectCategory("Drill")
 	elseif input.KeyCode == Enum.KeyCode.Three then
 		PlacementController.SelectCategory("Smelter")
+	elseif input.KeyCode == Enum.KeyCode.Four then
+		PlacementController.SelectCategory("Sink")
 	elseif input.UserInputType == Enum.UserInputType.MouseButton1 then
 		if isPlacementActive and currentGridCoord and isCellVacant then
 			Network.Remotes.PlaceObject:FireServer(currentGridCoord, selectedCategory, orientation)
+		end
+	elseif input.UserInputType == Enum.UserInputType.MouseButton2 or input.KeyCode == Enum.KeyCode.X then
+		if isPlacementActive and currentGridCoord and not isCellVacant then
+			Network.Remotes.RemoveObject:FireServer(currentGridCoord)
 		end
 	end
 end

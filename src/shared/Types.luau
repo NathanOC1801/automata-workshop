@@ -9,7 +9,7 @@ export type ItemData = {
 	stackSize: number,
 }
 
-export type MachineCategory = "Drill" | "Conveyor" | "Smelter" | "Assembler" | "Storage"
+export type MachineCategory = "Drill" | "Conveyor" | "Smelter" | "Assembler" | "Storage" | "Sink"
 
 export type MachineData = {
 	id: string,
