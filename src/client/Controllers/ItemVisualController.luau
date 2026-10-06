@@ -1,13 +1,16 @@
 --!strict
 
 local Workspace = game:GetService("Workspace")
+local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
+local MarketplaceService = game:GetService("MarketplaceService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Types = require(ReplicatedStorage.Shared.Types)
 local GridMath = require(ReplicatedStorage.Shared.Utility.GridMath)
 local Network = require(ReplicatedStorage.Shared.Network)
+local MonetizationConfig = require(ReplicatedStorage.Shared.Config.Monetization)
 
 export type ConveyorItemSyncPayload = {
 	coord: Vector3int16,
@@ -25,14 +28,32 @@ type ItemVisualData = {
 local ItemVisualController = {}
 
 local ITEM_STYLES: { [string]: { color: Color3, material: Enum.Material } } = {
+	-- Ores
 	RawIron = { color = Color3.fromRGB(115, 115, 115), material = Enum.Material.Slate },
 	RawCopper = { color = Color3.fromRGB(184, 115, 51), material = Enum.Material.Slate },
+	RawTitanium = { color = Color3.fromRGB(180, 190, 200), material = Enum.Material.Slate },
+	RawCobalt = { color = Color3.fromRGB(30, 70, 160), material = Enum.Material.Slate },
+	RawGold = { color = Color3.fromRGB(220, 180, 40), material = Enum.Material.Slate },
+	RawEmerald = { color = Color3.fromRGB(10, 180, 80), material = Enum.Material.Glass },
+	RawDiamond = { color = Color3.fromRGB(120, 220, 255), material = Enum.Material.Glass },
+	RawUranium = { color = Color3.fromRGB(80, 230, 50), material = Enum.Material.Neon },
+
+	-- Processed Materials
 	IronIngot = { color = Color3.fromRGB(200, 200, 205), material = Enum.Material.Metal },
 	CopperIngot = { color = Color3.fromRGB(220, 130, 60), material = Enum.Material.Metal },
+	TitaniumIngot = { color = Color3.fromRGB(190, 200, 215), material = Enum.Material.Metal },
+	CobaltIngot = { color = Color3.fromRGB(40, 90, 210), material = Enum.Material.Metal },
+	GoldBar = { color = Color3.fromRGB(255, 215, 0), material = Enum.Material.Metal },
+	CutEmerald = { color = Color3.fromRGB(0, 255, 120), material = Enum.Material.Neon },
+	PolishedDiamond = { color = Color3.fromRGB(180, 240, 255), material = Enum.Material.Glass },
+
+	-- Components
 	IronPlate = { color = Color3.fromRGB(160, 165, 170), material = Enum.Material.CorrodedMetal },
 	Wire = { color = Color3.fromRGB(255, 205, 50), material = Enum.Material.SmoothPlastic },
 	Circuit = { color = Color3.fromRGB(0, 200, 100), material = Enum.Material.SmoothPlastic },
 	ReinforcedPlate = { color = Color3.fromRGB(90, 100, 110), material = Enum.Material.DiamondPlate },
+	TitaniumFrame = { color = Color3.fromRGB(140, 160, 185), material = Enum.Material.Metal },
+	SolarCell = { color = Color3.fromRGB(20, 30, 70), material = Enum.Material.SmoothPlastic },
 }
 
 local DEFAULT_STYLE = { color = Color3.fromRGB(255, 255, 255), material = Enum.Material.SmoothPlastic }
@@ -57,6 +78,20 @@ local function getDirectionOffset(orientation: number): Vector3int16
 	else
 		return Vector3int16.new(0, 0, -1)
 	end
+end
+
+local player = Players.LocalPlayer
+local isDoubleConveyorSpeedOwned = false
+
+local function checkPassOwnership()
+	task.spawn(function()
+		local success, owns = pcall(function()
+			return MarketplaceService:UserOwnsGamePassAsync(player.UserId, MonetizationConfig.DoubleConveyorSpeedPassId)
+		end)
+		if success and owns then
+			isDoubleConveyorSpeedOwned = true
+		end
+	end)
 end
 
 local partPool: { ItemVisualData } = {}
@@ -180,8 +215,8 @@ function ItemVisualController.OnSyncConveyorItems(payload: { ConveyorItemSyncPay
 end
 
 function ItemVisualController.OnRenderStepped(dt: number)
-	-- Smooth dt * 14 lerp alpha with subtle mechanical settling bob
-	local lerpFactor = math.clamp(dt * 14, 0, 1)
+	local speedMult = isDoubleConveyorSpeedOwned and 2.0 or 1.0
+	local lerpFactor = math.clamp(dt * 14 * speedMult, 0, 1)
 	for _, visual in pairs(activeVisuals) do
 		if visual.inUse then
 			local currentPos = visual.part.Position
@@ -193,6 +228,8 @@ function ItemVisualController.OnRenderStepped(dt: number)
 end
 
 function ItemVisualController.Init()
+	checkPassOwnership()
+
 	Network.Remotes.SyncConveyorItems.OnClientEvent:Connect(function(payload)
 		if typeof(payload) == "table" then
 			ItemVisualController.OnSyncConveyorItems(payload)

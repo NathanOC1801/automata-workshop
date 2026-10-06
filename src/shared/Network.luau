@@ -62,6 +62,9 @@ local milestoneProgressUpdatedRemote = getOrCreateRemoteEvent("MilestoneProgress
 local selectRecipeRemote = getOrCreateRemoteEvent("SelectRecipe", remotesFolder)
 local setMachineRecipeRemote = getOrCreateRemoteEvent("SetMachineRecipe", remotesFolder)
 local clearBufferRemote = getOrCreateRemoteEvent("ClearBuffer", remotesFolder)
+local planetUnlockedRemote = getOrCreateRemoteEvent("PlanetUnlocked", remotesFolder)
+local teleportToPlanetRemote = getOrCreateRemoteEvent("TeleportToPlanet", remotesFolder)
+local openPlanetaryMapRemote = getOrCreateRemoteEvent("OpenPlanetaryMap", remotesFolder)
 
 local getMachineStateFunction = getOrCreateRemoteFunction("GetMachineState", remotesFolder)
 
@@ -75,6 +78,9 @@ Network.Remotes = {
 	SelectRecipe = selectRecipeRemote,
 	SetMachineRecipe = setMachineRecipeRemote,
 	ClearBuffer = clearBufferRemote,
+	PlanetUnlocked = planetUnlockedRemote,
+	TeleportToPlanet = teleportToPlanetRemote,
+	OpenPlanetaryMap = openPlanetaryMapRemote,
 	GetMachineState = getMachineStateFunction,
 }
 
