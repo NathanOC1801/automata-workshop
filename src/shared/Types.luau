@@ -1,12 +1,34 @@
 --!strict
 
-export type ItemId = "RawIron" | "RawCopper" | "IronIngot" | "CopperIngot" | "IronPlate" | "Wire" | "Circuit" | "ReinforcedPlate"
+export type ItemId =
+	| "RawIron"
+	| "RawCopper"
+	| "RawTitanium"
+	| "RawCobalt"
+	| "RawGold"
+	| "RawEmerald"
+	| "RawDiamond"
+	| "RawUranium"
+	| "IronIngot"
+	| "CopperIngot"
+	| "TitaniumIngot"
+	| "CobaltIngot"
+	| "GoldBar"
+	| "CutEmerald"
+	| "PolishedDiamond"
+	| "IronPlate"
+	| "Wire"
+	| "Circuit"
+	| "ReinforcedPlate"
+	| "TitaniumFrame"
+	| "SolarCell"
 
 export type ItemData = {
 	id: ItemId,
 	displayName: string,
 	description: string,
 	stackSize: number,
+	baseValue: number,
 }
 
 export type MachineCategory = "Drill" | "Conveyor" | "Smelter" | "Assembler" | "Storage" | "Sink" | "Splitter" | "Merger"

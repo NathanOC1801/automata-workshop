@@ -1,32 +1,48 @@
 --!strict
 
 local Workspace = game:GetService("Workspace")
-local SoundService = game:GetService("SoundService")
 
 local AudioController = {}
 
 local activeSounds: { [BasePart]: Sound } = {}
 
-local function startBackgroundMusic()
-	local bgm = Instance.new("Sound")
-	bgm.Name = "FactoryBGM"
-	bgm.SoundId = "rbxassetid://1843404009"
-	bgm.Volume = 0.22
-	bgm.Looped = true
-	bgm.Parent = SoundService
-	bgm:Play()
-end
+-- Built-in Roblox engine sounds (guaranteed to load offline without permissions or asset type errors)
+local SOUND_CONFIG: { [string]: { sound: string, volume: number, playbackSpeed: number } } = {
+	Conveyor = {
+		sound = "rbxasset://sounds/action_swim.mp3", -- Fluid continuous movement sound
+		volume = 0.18,
+		playbackSpeed = 0.65, -- Lower pitch turns it into a mechanical belt hum
+	},
+	Drill = {
+		sound = "rbxasset://sounds/impact_water.mp3",
+		volume = 0.35,
+		playbackSpeed = 0.45, -- Heavy low-end mechanical thudding
+	},
+	Smelter = {
+		sound = "rbxasset://sounds/action_footsteps_plastic.mp3",
+		volume = 0.25,
+		playbackSpeed = 0.35, -- Crackle / low combustion resonance
+	},
+	Assembler = {
+		sound = "rbxasset://sounds/action_swim.mp3",
+		volume = 0.22,
+		playbackSpeed = 0.85,
+	},
+}
 
-local function createSound(part: BasePart, soundId: string, volume: number): Sound
+local function createSound(part: BasePart, soundPath: string, volume: number, playbackSpeed: number): Sound
 	local sound = Instance.new("Sound")
-	sound.SoundId = soundId
+	sound.Name = "MachineHum"
+	sound.SoundId = soundPath
 	sound.Volume = volume
+	sound.PlaybackSpeed = playbackSpeed
 	sound.Looped = true
-	sound.RollOffMode = Enum.RollOffMode.LinearSquare
-	sound.RollOffMinDistance = 6
-	sound.RollOffMaxDistance = 32
+	sound.RollOffMode = Enum.RollOffMode.Linear
+	sound.MaxDistance = 32
+	sound.MinDistance = 6
 	sound.Parent = part
 	sound:Play()
+
 	return sound
 end
 
@@ -34,12 +50,10 @@ local function handleChildAdded(child: Instance)
 	if child:IsA("BasePart") then
 		local nameParts = string.split(child.Name, "_")
 		local category = nameParts[1]
-		if category == "Conveyor" then
-			activeSounds[child] = createSound(child, "rbxassetid://9114223166", 0.18)
-		elseif category == "Drill" then
-			activeSounds[child] = createSound(child, "rbxassetid://9114223166", 0.20)
-		elseif category == "Smelter" then
-			activeSounds[child] = createSound(child, "rbxassetid://9114223166", 0.22)
+		local cfg = SOUND_CONFIG[category]
+
+		if cfg then
+			activeSounds[child] = createSound(child, cfg.sound, cfg.volume, cfg.playbackSpeed)
 		end
 	end
 end
@@ -56,16 +70,19 @@ local function handleChildRemoved(child: Instance)
 end
 
 function AudioController.Init()
-	startBackgroundMusic()
-
-	local placedFolder = Workspace:WaitForChild("PlacedObjects", 10)
-	if placedFolder then
-		for _, child in ipairs(placedFolder:GetChildren()) do
-			handleChildAdded(child)
+	task.spawn(function()
+		local placedFolder = Workspace:WaitForChild("PlacedObjects", 10)
+		if placedFolder then
+			for _, child in ipairs(placedFolder:GetChildren()) do
+				handleChildAdded(child)
+			end
+			placedFolder.ChildAdded:Connect(handleChildAdded)
+			placedFolder.ChildRemoved:Connect(handleChildRemoved)
+		else
+			warn("[AudioController] PlacedObjects folder was not found within timeout.")
 		end
-		placedFolder.ChildAdded:Connect(handleChildAdded)
-		placedFolder.ChildRemoved:Connect(handleChildRemoved)
-	end
+	end)
+
 	print("[AudioController] Initialized.")
 end
 
