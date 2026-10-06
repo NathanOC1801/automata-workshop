@@ -1,6 +1,7 @@
 --!strict
 
-local Types = require(script.Parent.Parent.Parent.shared.Types)
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Types = require(ReplicatedStorage.Shared.Types)
 local GridService = require(script.Parent.GridService)
 
 export type ConveyorCell = {
