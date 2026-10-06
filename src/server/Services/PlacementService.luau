@@ -106,9 +106,9 @@ function PlacementService.OnPlaceObjectRequest(
 
 	-- Handle machine logic registration
 	if category == "Conveyor" then
-		ConveyorService.CreateConveyor(coord, orientation, player.UserId)
+		ConveyorService.CreateConveyor(coord, orientation)
 	elseif category == "Drill" or category == "Smelter" or category == "Sink" or category == "Splitter" or category == "Merger" or category == "Storage" or category == "Assembler" then
-		MachineService.CreateMachine(coord, category, orientation, player.UserId)
+		MachineService.CreateMachine(coord, category, orientation)
 	else
 		GridService.SetCell(coord, {
 			machineId = machineId,

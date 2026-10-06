@@ -34,10 +34,12 @@ local function createMilestoneHUD()
 	screenGui.Name = "MilestoneHUD"
 	screenGui.ResetOnSpawn = false
 
+	-- Top-Left Positioned Card to eliminate overlap with Top-Right Credits Bar
 	local card = Instance.new("Frame")
 	card.Name = "MilestoneCard"
 	card.Size = UDim2.new(0, 300, 0, 160)
-	card.Position = UDim2.new(1, -310, 0, 70)
+	card.Position = UDim2.new(0, 20, 0, 16)
+	card.AnchorPoint = Vector2.new(0, 0)
 	card.BackgroundColor3 = Color3.fromRGB(30, 32, 36)
 	card.BorderSizePixel = 0
 	card.Parent = screenGui
@@ -56,7 +58,7 @@ local function createMilestoneHUD()
 	title.Size = UDim2.new(1, -20, 0, 30)
 	title.Position = UDim2.new(0, 10, 0, 8)
 	title.BackgroundTransparency = 1
-	title.Text = "Milestone: Loading..."
+	title.Text = "Milestone 1: Base Automation"
 	title.TextColor3 = Color3.fromRGB(255, 255, 255)
 	title.TextSize = 15
 	title.Font = Enum.Font.SourceSansBold
@@ -84,7 +86,7 @@ local function createMilestoneHUD()
 	cLabel.Name = "CreditsText"
 	cLabel.Size = UDim2.new(1, 0, 0, 18)
 	cLabel.BackgroundTransparency = 1
-	cLabel.Text = "Credits: $0 / $0"
+	cLabel.Text = "Credits: $250 / $0"
 	cLabel.TextColor3 = Color3.fromRGB(200, 220, 255)
 	cLabel.TextSize = 13
 	cLabel.Font = Enum.Font.SourceSans
@@ -104,7 +106,7 @@ local function createMilestoneHUD()
 	cCorner.Parent = cBarBg
 
 	local cFill = Instance.new("Frame")
-	cFill.Size = UDim2.new(0, 0, 1, 0)
+	cFill.Size = UDim2.new(1, 0, 1, 0)
 	cFill.BackgroundColor3 = Color3.fromRGB(85, 255, 127)
 	cFill.BorderSizePixel = 0
 	cFill.Parent = cBarBg
