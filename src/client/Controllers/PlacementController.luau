@@ -24,10 +24,27 @@ local surfaceGui: SurfaceGui? = nil
 local currentGridCoord: Vector3int16? = nil
 local isCellVacant = true
 
+local function getGhostSizeAndOffset(category: Types.MachineCategory): (Vector3, number)
+	if category == "Conveyor" then
+		return Vector3.new(4, 1, 4), 0.5
+	else
+		return Vector3.new(4, 4, 4), 2.0
+	end
+end
+
+local function updateGhostAppearance()
+	if not ghostPart then
+		return
+	end
+	local size, _ = getGhostSizeAndOffset(selectedCategory)
+	ghostPart.Size = size
+end
+
 local function createGhostPart(): Part
+	local size, _ = getGhostSizeAndOffset(selectedCategory)
 	local part = Instance.new("Part")
 	part.Name = "PlacementGhost"
-	part.Size = Vector3.new(4, 1, 4)
+	part.Size = size
 	part.Anchored = true
 	part.CanCollide = false
 	part.CanTouch = false
@@ -67,10 +84,10 @@ local function checkCellVacant(coord: Vector3int16): boolean
 	if not placedFolder then
 		return true
 	end
-	local worldPos = GridMath.gridToWorld(coord) + Vector3.new(0, 0.5, 0)
+	local worldPos = GridMath.gridToWorld(coord)
 	for _, obj in ipairs(placedFolder:GetChildren()) do
 		if obj:IsA("BasePart") then
-			if (obj.Position - worldPos).Magnitude < 0.5 then
+			if math.abs(obj.Position.X - worldPos.X) < 1 and math.abs(obj.Position.Z - worldPos.Z) < 1 then
 				return false
 			end
 		end
@@ -82,7 +99,7 @@ function PlacementController.TogglePlacementMode()
 	isPlacementActive = not isPlacementActive
 	if isPlacementActive then
 		ghostPart = createGhostPart()
-		print("[PlacementController] Placement mode enabled. Press 'R' to rotate, 'E' to toggle off.")
+		print("[PlacementController] Placement mode enabled. Keys 1=Conveyor, 2=Drill, 3=Smelter. 'R' rotate, 'E' toggle.")
 	else
 		destroyGhostPart()
 		print("[PlacementController] Placement mode disabled.")
@@ -96,6 +113,14 @@ function PlacementController.RotateOrientation()
 	orientation = (orientation + 90) % 360
 end
 
+function PlacementController.SelectCategory(category: Types.MachineCategory)
+	selectedCategory = category
+	if isPlacementActive then
+		updateGhostAppearance()
+	end
+	print(string.format("[PlacementController] Selected category: %s", category))
+end
+
 function PlacementController.OnInputBegan(input: InputObject, gameProcessed: boolean)
 	if gameProcessed then
 		return
@@ -105,6 +130,12 @@ function PlacementController.OnInputBegan(input: InputObject, gameProcessed: boo
 		PlacementController.TogglePlacementMode()
 	elseif input.KeyCode == Enum.KeyCode.R then
 		PlacementController.RotateOrientation()
+	elseif input.KeyCode == Enum.KeyCode.One then
+		PlacementController.SelectCategory("Conveyor")
+	elseif input.KeyCode == Enum.KeyCode.Two then
+		PlacementController.SelectCategory("Drill")
+	elseif input.KeyCode == Enum.KeyCode.Three then
+		PlacementController.SelectCategory("Smelter")
 	elseif input.UserInputType == Enum.UserInputType.MouseButton1 then
 		if isPlacementActive and currentGridCoord and isCellVacant then
 			Network.Remotes.PlaceObject:FireServer(currentGridCoord, selectedCategory, orientation)
@@ -135,7 +166,8 @@ function PlacementController.OnRenderStepped()
 		currentGridCoord = gridCoord
 
 		local worldPos = GridMath.gridToWorld(gridCoord)
-		local posWithOffset = worldPos + Vector3.new(0, 0.5, 0)
+		local _, heightOffset = getGhostSizeAndOffset(selectedCategory)
+		local posWithOffset = worldPos + Vector3.new(0, heightOffset, 0)
 
 		ghostPart.CFrame = CFrame.new(posWithOffset) * CFrame.Angles(0, math.rad(orientation), 0)
 
