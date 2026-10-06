@@ -25,10 +25,13 @@ local function spawnDepositNode(coord: Vector3int16, depositType: "Iron" | "Copp
 	local worldPos = GridMath.gridToWorld(coord)
 	local part = Instance.new("Part")
 	part.Name = string.format("%sDeposit_%d_%d_%d", depositType, coord.X, coord.Y, coord.Z)
-	part.Size = Vector3.new(4, 0.2, 4)
-	part.Position = Vector3.new(worldPos.X, -0.1, worldPos.Z)
+	part.Size = Vector3.new(3.8, 0.2, 3.8)
+	-- Top surface sits flush at Y = 0.2, cleanly above the Y = 0 baseplate surface to eliminate Z-fighting
+	part.Position = Vector3.new(worldPos.X, 0.1, worldPos.Z)
 	part.Anchored = true
-	part.CanCollide = true
+	part.CanCollide = false
+	part.CanTouch = false
+	part.CanQuery = false
 	part.CastShadow = false
 
 	if depositType == "Iron" then
