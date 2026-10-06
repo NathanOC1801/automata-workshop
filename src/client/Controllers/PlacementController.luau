@@ -301,6 +301,10 @@ function PlacementController.OnRenderStepped()
 	if player.Character then
 		table.insert(excludeList, player.Character)
 	end
+	local mapDeco = Workspace:FindFirstChild("MapDecoration")
+	if mapDeco then
+		table.insert(excludeList, mapDeco)
+	end
 	raycastParams.FilterDescendantsInstances = excludeList
 
 	local result = Workspace:Raycast(ray.Origin, ray.Direction * 500, raycastParams)
