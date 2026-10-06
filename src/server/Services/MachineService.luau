@@ -17,6 +17,7 @@ export type MachineInstance = {
 	timer: number,
 	recipe: Types.Recipe?,
 	outputBuffer: string?,
+	inputBuffer: { [string]: number },
 	splitterIndex: number, -- 1 = Front, 2 = Left, 3 = Right
 	mergerIndex: number, -- 1 = Left, 2 = Behind, 3 = Right
 	storageQueue: { string },
@@ -30,15 +31,16 @@ local function coordToKey(coord: Vector3int16): string
 	return string.format("%d,%d,%d", coord.X, coord.Y, coord.Z)
 end
 
+-- 0° -> -Z, 90° -> -X, 180° -> +Z, 270° -> +X
 function MachineService.GetForwardOffset(orientation: number): Vector3int16
 	if orientation == 0 then
 		return Vector3int16.new(0, 0, -1)
 	elseif orientation == 90 then
-		return Vector3int16.new(1, 0, 0)
+		return Vector3int16.new(-1, 0, 0)
 	elseif orientation == 180 then
 		return Vector3int16.new(0, 0, 1)
 	elseif orientation == 270 then
-		return Vector3int16.new(-1, 0, 0)
+		return Vector3int16.new(1, 0, 0)
 	else
 		return Vector3int16.new(0, 0, -1)
 	end
@@ -53,11 +55,11 @@ function MachineService.GetLeftOffset(orientation: number): Vector3int16
 	if orientation == 0 then
 		return Vector3int16.new(-1, 0, 0)
 	elseif orientation == 90 then
-		return Vector3int16.new(0, 0, -1)
+		return Vector3int16.new(0, 0, 1)
 	elseif orientation == 180 then
 		return Vector3int16.new(1, 0, 0)
 	elseif orientation == 270 then
-		return Vector3int16.new(0, 0, 1)
+		return Vector3int16.new(0, 0, -1)
 	else
 		return Vector3int16.new(-1, 0, 0)
 	end
@@ -77,6 +79,7 @@ function MachineService.CreateMachine(coord: Vector3int16, category: Types.Machi
 		timer = 0,
 		recipe = nil,
 		outputBuffer = nil,
+		inputBuffer = {},
 		splitterIndex = 1,
 		mergerIndex = 1,
 		storageQueue = {},
@@ -103,16 +106,16 @@ function MachineService.RemoveMachine(coord: Vector3int16)
 	GridService.ClearCell(coord)
 end
 
-local function findMatchingRecipe(inputId: string): Types.Recipe?
+local function findMatchingRecipe(inputId: string, category: string): Types.Recipe?
 	for _, recipe in pairs(Recipes) do
-		if recipe.inputs[inputId :: Types.ItemId] ~= nil then
+		if recipe.machineType == category and recipe.inputs[inputId :: Types.ItemId] ~= nil then
 			return recipe
 		end
 	end
 	return nil
 end
 
-local function setSmelterLightBrightness(coord: Vector3int16, category: string, brightness: number)
+local function setSmelterVisualState(coord: Vector3int16, category: string, isCrafting: boolean)
 	local placedFolder = Workspace:FindFirstChild("PlacedObjects")
 	if placedFolder then
 		local partName = string.format("%s_%d_%d_%d", category, coord.X, coord.Y, coord.Z)
@@ -120,9 +123,30 @@ local function setSmelterLightBrightness(coord: Vector3int16, category: string, 
 		if part then
 			local light = part:FindFirstChild("FurnaceLight")
 			if light and light:IsA("PointLight") then
-				light.Brightness = brightness
+				light.Brightness = isCrafting and 3 or 0
+			end
+			local emitter = part:FindFirstChild("SmokeParticles")
+			if emitter and emitter:IsA("ParticleEmitter") then
+				emitter.Enabled = isCrafting
 			end
 		end
+	end
+end
+
+local function checkRecipeSatisfied(machine: MachineInstance, recipe: Types.Recipe): boolean
+	for itemId, count in pairs(recipe.inputs) do
+		local currentCount = machine.inputBuffer[itemId] or 0
+		if currentCount < count then
+			return false
+		end
+	end
+	return true
+end
+
+local function consumeRecipeIngredients(machine: MachineInstance, recipe: Types.Recipe)
+	for itemId, count in pairs(recipe.inputs) do
+		local currentCount = machine.inputBuffer[itemId] or 0
+		machine.inputBuffer[itemId] = math.max(0, currentCount - count)
 	end
 end
 
@@ -169,7 +193,7 @@ function MachineService.StepMachines(dt: number)
 			end
 
 		elseif machine.category == "Smelter" then
-			-- Attempt to eject outputBuffer first
+			-- Eject output
 			if machine.outputBuffer ~= nil then
 				local frontConveyor = ConveyorService.GetConveyor(frontCoord)
 				if frontConveyor then
@@ -182,9 +206,9 @@ function MachineService.StepMachines(dt: number)
 				end
 			end
 
-			-- If actively crafting
+			-- Crafting state
 			if machine.recipe ~= nil then
-				setSmelterLightBrightness(machine.coord, machine.category, 3)
+				setSmelterVisualState(machine.coord, machine.category, true)
 				machine.timer += dt
 				if machine.timer >= machine.recipe.craftDuration then
 					local outputItem: string? = nil
@@ -195,29 +219,84 @@ function MachineService.StepMachines(dt: number)
 					machine.outputBuffer = outputItem
 					machine.recipe = nil
 					machine.timer = 0
-					setSmelterLightBrightness(machine.coord, machine.category, 0)
+					setSmelterVisualState(machine.coord, machine.category, false)
 				end
-			-- If idle and outputBuffer is clear, attempt to pull input from Behind conveyor's Slot 4
 			elseif machine.outputBuffer == nil then
-				setSmelterLightBrightness(machine.coord, machine.category, 0)
+				setSmelterVisualState(machine.coord, machine.category, false)
 				local behindConveyor = ConveyorService.GetConveyor(behindCoord)
 				if behindConveyor then
 					local slot4 = behindConveyor.slots[4]
 					if slot4.itemId ~= nil then
-						local matchingRecipe = findMatchingRecipe(slot4.itemId)
-						if matchingRecipe and matchingRecipe.machineType == "Smelter" then
+						local matchingRecipe = findMatchingRecipe(slot4.itemId, "Smelter")
+						if matchingRecipe then
 							slot4.itemId = nil
 							slot4.progress = 0.0
 							machine.recipe = matchingRecipe
 							machine.timer = 0
-							setSmelterLightBrightness(machine.coord, machine.category, 3)
+							setSmelterVisualState(machine.coord, machine.category, true)
+						end
+					end
+				end
+			end
+
+		elseif machine.category == "Assembler" then
+			-- Eject output
+			if machine.outputBuffer ~= nil then
+				local frontConveyor = ConveyorService.GetConveyor(frontCoord)
+				if frontConveyor then
+					local slot1 = frontConveyor.slots[1]
+					if slot1.itemId == nil then
+						slot1.itemId = machine.outputBuffer :: Types.ItemId
+						slot1.progress = 1.0
+						machine.outputBuffer = nil
+					end
+				end
+			end
+
+			-- Pull ingredients from behind conveyor AND adjacent feeder conveyors at rear
+			local sourceCoords = { behindCoord, leftCoord, rightCoord }
+			for _, srcCoord in ipairs(sourceCoords) do
+				local inConveyor = ConveyorService.GetConveyor(srcCoord)
+				if inConveyor then
+					local slot4 = inConveyor.slots[4]
+					if slot4.itemId ~= nil then
+						local item = slot4.itemId
+						local current = machine.inputBuffer[item] or 0
+						machine.inputBuffer[item] = current + 1
+						slot4.itemId = nil
+						slot4.progress = 0.0
+					end
+				end
+			end
+
+			-- Check active crafting or select recipe
+			if machine.recipe ~= nil then
+				machine.timer += dt
+				if machine.timer >= machine.recipe.craftDuration then
+					local outputItem: string? = nil
+					for itemId, count in pairs(machine.recipe.outputs) do
+						outputItem = itemId
+						break
+					end
+					machine.outputBuffer = outputItem
+					machine.recipe = nil
+					machine.timer = 0
+				end
+			elseif machine.outputBuffer == nil then
+				-- Check if any Assembler recipe is satisfied by inputBuffer
+				for _, recipe in pairs(Recipes) do
+					if recipe.machineType == "Assembler" then
+						if checkRecipeSatisfied(machine, recipe) then
+							consumeRecipeIngredients(machine, recipe)
+							machine.recipe = recipe
+							machine.timer = 0
+							break
 						end
 					end
 				end
 			end
 
 		elseif machine.category == "Splitter" then
-			-- 1 Input at Behind -> 3 Outputs at Front, Left, Right (round-robin)
 			if machine.outputBuffer == nil then
 				local behindConveyor = ConveyorService.GetConveyor(behindCoord)
 				if behindConveyor then
@@ -237,7 +316,6 @@ function MachineService.StepMachines(dt: number)
 					{ coord = rightCoord, name = "Right" },
 				}
 
-				-- Attempt round-robin ejection starting from splitterIndex
 				for attempt = 0, 2 do
 					local dirIdx = ((machine.splitterIndex - 1 + attempt) % 3) + 1
 					local targetData = directions[dirIdx]
@@ -256,7 +334,6 @@ function MachineService.StepMachines(dt: number)
 			end
 
 		elseif machine.category == "Merger" then
-			-- 3 Inputs at Left, Behind, Right -> 1 Output at Front (round-robin)
 			if machine.outputBuffer ~= nil then
 				local frontConveyor = ConveyorService.GetConveyor(frontCoord)
 				if frontConveyor then
@@ -288,7 +365,6 @@ function MachineService.StepMachines(dt: number)
 							slot4.progress = 0.0
 							machine.mergerIndex = (inIdx % 3) + 1
 
-							-- Eject immediately to Front if possible
 							local frontConveyor = ConveyorService.GetConveyor(frontCoord)
 							if frontConveyor then
 								local slot1 = frontConveyor.slots[1]
@@ -305,8 +381,6 @@ function MachineService.StepMachines(dt: number)
 			end
 
 		elseif machine.category == "Storage" then
-			-- Storage Silo: FIFO Queue Capacity 50. Input Behind (+Z), Output Front (-Z).
-			-- Pull from Behind
 			if #machine.storageQueue < 50 then
 				local behindConveyor = ConveyorService.GetConveyor(behindCoord)
 				if behindConveyor then
@@ -319,7 +393,6 @@ function MachineService.StepMachines(dt: number)
 				end
 			end
 
-			-- Eject to Front
 			if #machine.storageQueue > 0 then
 				local frontConveyor = ConveyorService.GetConveyor(frontCoord)
 				if frontConveyor then
@@ -335,7 +408,6 @@ function MachineService.StepMachines(dt: number)
 			end
 
 		elseif machine.category == "Sink" then
-			-- Item Sink: Pull items from Behind conveyor's Slot 4 and consume them for credits
 			local behindConveyor = ConveyorService.GetConveyor(behindCoord)
 			if behindConveyor then
 				local slot4 = behindConveyor.slots[4]
@@ -345,7 +417,6 @@ function MachineService.StepMachines(dt: number)
 					slot4.progress = 0.0
 					print(string.format("[Sink] Consumed %s for +10 Credits at (%d, %d, %d)", consumedItem, machine.coord.X, machine.coord.Y, machine.coord.Z))
 
-					-- Award credits to all active players
 					for _, player in ipairs(Players:GetPlayers()) do
 						EconomyService.AddCredits(player, 10)
 					end

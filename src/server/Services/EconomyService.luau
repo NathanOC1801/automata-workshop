@@ -17,12 +17,15 @@ function EconomyService.GetCredits(player: Player): number
 	return playerCredits[userId]
 end
 
-function EconomyService.AddCredits(player: Player, amount: number)
+function EconomyService.SetCredits(player: Player, amount: number)
 	local userId = player.UserId
+	playerCredits[userId] = amount
+	Network.Remotes.SyncCredits:FireClient(player, amount)
+end
+
+function EconomyService.AddCredits(player: Player, amount: number)
 	local current = EconomyService.GetCredits(player)
-	local updated = current + amount
-	playerCredits[userId] = updated
-	Network.Remotes.SyncCredits:FireClient(player, updated)
+	EconomyService.SetCredits(player, current + amount)
 end
 
 function EconomyService.DeductCredits(player: Player, amount: number): boolean
@@ -30,9 +33,7 @@ function EconomyService.DeductCredits(player: Player, amount: number): boolean
 	if current < amount then
 		return false
 	end
-	local updated = current - amount
-	playerCredits[player.UserId] = updated
-	Network.Remotes.SyncCredits:FireClient(player, updated)
+	EconomyService.SetCredits(player, current - amount)
 	return true
 end
 

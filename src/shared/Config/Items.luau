@@ -39,6 +39,18 @@ local Items: { [Types.ItemId]: Types.ItemData } = {
 		description = "Extruded copper strand",
 		stackSize = 150,
 	},
+	Circuit = {
+		id = "Circuit",
+		displayName = "Electronic Circuit",
+		description = "Basic logic circuit",
+		stackSize = 100,
+	},
+	ReinforcedPlate = {
+		id = "ReinforcedPlate",
+		displayName = "Reinforced Plate",
+		description = "Heavy composite metal plate",
+		stackSize = 50,
+	},
 }
 
 return table.freeze(Items)
