@@ -39,9 +39,11 @@ end
 
 local remotesFolder = getOrCreateFolder("Remotes", ReplicatedStorage)
 local placeObjectRemote = getOrCreateRemoteEvent("PlaceObject", remotesFolder)
+local syncConveyorItemsRemote = getOrCreateRemoteEvent("SyncConveyorItems", remotesFolder)
 
 Network.Remotes = {
 	PlaceObject = placeObjectRemote,
+	SyncConveyorItems = syncConveyorItemsRemote,
 }
 
 return Network
