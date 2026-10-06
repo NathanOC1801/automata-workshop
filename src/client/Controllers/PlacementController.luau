@@ -23,6 +23,9 @@ local ghostPart: Part? = nil
 local currentGridCoord: Vector3int16? = nil
 local isCellVacant = true
 
+local isDragging = false
+local previousDragCoord: Vector3int16? = nil
+
 local function getGhostSizeAndOffset(category: Types.MachineCategory): (Vector3, number)
 	if category == "Conveyor" then
 		return Vector3.new(4, 1, 4), 0.5
@@ -58,20 +61,16 @@ local function buildGhostPorts(parentPart: BasePart, category: Types.MachineCate
 	end
 
 	if category == "Conveyor" then
-		-- Green front output strip (Front / -Z)
 		local frontPort = createNeonPortMarker(parentPart, true, Vector3.new(2.8, 0.05, 0.3))
 		frontPort.CFrame = parentPart.CFrame * CFrame.new(0, 0.51, -1.8)
 
-		-- Orange rear input strip (Rear / +Z)
 		local rearPort = createNeonPortMarker(parentPart, false, Vector3.new(2.8, 0.05, 0.3))
 		rearPort.CFrame = parentPart.CFrame * CFrame.new(0, 0.51, 1.8)
 
 	elseif category == "Assembler" then
-		-- 1 Green Output marker on front face (-Z), Size = (1.6, 0.2, 0.4)
 		local outPort = createNeonPortMarker(parentPart, true, Vector3.new(1.6, 0.2, 0.4))
 		outPort.CFrame = parentPart.CFrame * CFrame.new(0, 0, -2.05)
 
-		-- Dual Orange Input markers on rear face (+Z), Size = (1.2, 0.2, 0.4)
 		local leftIn = createNeonPortMarker(parentPart, false, Vector3.new(1.2, 0.2, 0.4))
 		leftIn.CFrame = parentPart.CFrame * CFrame.new(-1.0, 0, 2.05)
 
@@ -130,8 +129,88 @@ local function checkCellVacant(coord: Vector3int16): boolean
 	return true
 end
 
+local function calculateDragOrientation(fromCoord: Vector3int16, toCoord: Vector3int16): number
+	local dx = toCoord.X - fromCoord.X
+	local dz = toCoord.Z - fromCoord.Z
+	if dz == -1 then
+		return 0 -- -Z
+	elseif dx == -1 then
+		return 90 -- -X
+	elseif dz == 1 then
+		return 180 -- +Z
+	elseif dx == 1 then
+		return 270 -- +X
+	end
+	return orientation
+end
+
+-- Auto-orientation snapping for single conveyor placement
+local function checkAutoOrientationSnap(coord: Vector3int16): number?
+	local placedFolder = Workspace:FindFirstChild("PlacedObjects")
+	if not placedFolder then
+		return nil
+	end
+
+	local neighborOffsets = {
+		Vector3int16.new(0, 0, 1),  -- Behind
+		Vector3int16.new(1, 0, 0),  -- Right
+		Vector3int16.new(0, 0, -1), -- Front
+		Vector3int16.new(-1, 0, 0), -- Left
+	}
+
+	for _, offset in ipairs(neighborOffsets) do
+		local neighborCoord = Vector3int16.new(coord.X + offset.X, coord.Y + offset.Y, coord.Z + offset.Z)
+		local neighborWorldPos = GridMath.gridToWorld(neighborCoord)
+		for _, obj in ipairs(placedFolder:GetChildren()) do
+			if obj:IsA("BasePart") then
+				if math.abs(obj.Position.X - neighborWorldPos.X) < 1 and math.abs(obj.Position.Z - neighborWorldPos.Z) < 1 then
+					-- Found adjacent machine/conveyor! Determine if its forward direction feeds into coord
+					local nameParts = string.split(obj.Name, "_")
+					local x, y, z = tonumber(nameParts[2]), tonumber(nameParts[3]), tonumber(nameParts[4])
+					if x and y and z then
+						local rotY = math.round(obj.Orientation.Y) % 360
+						if rotY < 0 then rotY += 360 end
+
+						local fwdDx, fwdDz = 0, 0
+						if rotY == 0 then fwdDz = -1
+						elseif rotY == 90 or rotY == 270 then
+							-- Check CFrame LookVector direction
+							local look = obj.CFrame.LookVector
+							if look.Z < -0.5 then fwdDz = -1
+							elseif look.Z > 0.5 then fwdDz = 1
+							elseif look.X < -0.5 then fwdDx = -1
+							elseif look.X > 0.5 then fwdDx = 1
+							end
+						elseif rotY == 180 then fwdDz = 1
+						end
+
+						local targetX = neighborCoord.X + fwdDx
+						local targetZ = neighborCoord.Z + fwdDz
+						if targetX == coord.X and targetZ == coord.Z then
+							-- Neighbor is pointing into coord! Auto-snap orientation away from neighbor
+							if fwdDz == -1 then return 0
+							elseif fwdDx == -1 then return 90
+							elseif fwdDz == 1 then return 180
+							elseif fwdDx == 1 then return 270
+							end
+						end
+					end
+				end
+			end
+		end
+	end
+
+	return nil
+end
+
+function PlacementController.IsPlacementActive(): boolean
+	return isPlacementActive
+end
+
 function PlacementController.TogglePlacementMode()
 	isPlacementActive = not isPlacementActive
+	isDragging = false
+	previousDragCoord = nil
 	if isPlacementActive then
 		ghostPart = createGhostPart()
 		print("[PlacementController] Placement mode enabled. Keys 1=Conveyor, 2=Drill, 3=Smelter, 4=Splitter, 5=Merger, 6=Storage, 7=Sink, 8=Assembler. Right-Click/X=Demolish. 'R'=Rotate, 'E'=Toggle.")
@@ -153,6 +232,8 @@ end
 
 function PlacementController.SelectCategory(category: Types.MachineCategory)
 	selectedCategory = category
+	isDragging = false
+	previousDragCoord = nil
 	if isPlacementActive then
 		updateGhostAppearance()
 	end
@@ -185,13 +266,25 @@ function PlacementController.OnInputBegan(input: InputObject, gameProcessed: boo
 	elseif input.KeyCode == Enum.KeyCode.Eight then
 		PlacementController.SelectCategory("Assembler")
 	elseif input.UserInputType == Enum.UserInputType.MouseButton1 then
-		if isPlacementActive and currentGridCoord and isCellVacant then
-			Network.Remotes.PlaceObject:FireServer(currentGridCoord, selectedCategory, orientation)
+		if isPlacementActive then
+			if selectedCategory == "Conveyor" then
+				isDragging = true
+				previousDragCoord = nil
+			elseif currentGridCoord and isCellVacant then
+				Network.Remotes.PlaceObject:FireServer(currentGridCoord, selectedCategory, orientation)
+			end
 		end
 	elseif input.UserInputType == Enum.UserInputType.MouseButton2 or input.KeyCode == Enum.KeyCode.X then
 		if isPlacementActive and currentGridCoord and not isCellVacant then
 			Network.Remotes.RemoveObject:FireServer(currentGridCoord)
 		end
+	end
+end
+
+function PlacementController.OnInputEnded(input: InputObject, gameProcessed: boolean)
+	if input.UserInputType == Enum.UserInputType.MouseButton1 then
+		isDragging = false
+		previousDragCoord = nil
 	end
 end
 
@@ -220,9 +313,17 @@ function PlacementController.OnRenderStepped()
 		local _, heightOffset = getGhostSizeAndOffset(selectedCategory)
 		local posWithOffset = worldPos + Vector3.new(0, heightOffset, 0)
 
+		-- Auto-orientation snap check when placing single conveyor
+		if selectedCategory == "Conveyor" and not isDragging then
+			local snapOrient = checkAutoOrientationSnap(gridCoord)
+			if snapOrient then
+				orientation = snapOrient
+			end
+		end
+
 		ghostPart.CFrame = CFrame.new(posWithOffset) * CFrame.Angles(0, math.rad(orientation), 0)
 
-		-- Update child port CFrames for the ghost
+		-- Update child port CFrames for ghost
 		if selectedCategory == "Conveyor" then
 			local frontPort = ghostPart:FindFirstChild("OutputPort")
 			if frontPort and frontPort:IsA("BasePart") then
@@ -256,6 +357,19 @@ function PlacementController.OnRenderStepped()
 			ghostPart.Color = Color3.fromRGB(255, 0, 0)
 		end
 		ghostPart.Transparency = 0.5
+
+		-- Drag-to-build logic for conveyors
+		if isDragging and selectedCategory == "Conveyor" and isCellVacant then
+			if previousDragCoord == nil then
+				Network.Remotes.PlaceObject:FireServer(gridCoord, "Conveyor", orientation)
+				previousDragCoord = gridCoord
+			elseif previousDragCoord ~= gridCoord then
+				local dragOrient = calculateDragOrientation(previousDragCoord, gridCoord)
+				orientation = dragOrient
+				Network.Remotes.PlaceObject:FireServer(gridCoord, "Conveyor", dragOrient)
+				previousDragCoord = gridCoord
+			end
+		end
 	else
 		currentGridCoord = nil
 		ghostPart.Transparency = 1.0
@@ -264,6 +378,7 @@ end
 
 function PlacementController.Init()
 	UserInputService.InputBegan:Connect(PlacementController.OnInputBegan)
+	UserInputService.InputEnded:Connect(PlacementController.OnInputEnded)
 	RunService.RenderStepped:Connect(PlacementController.OnRenderStepped)
 	print("[PlacementController] Initialized.")
 end

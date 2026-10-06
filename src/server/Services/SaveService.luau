@@ -7,6 +7,7 @@ local Workspace = game:GetService("Workspace")
 local EconomyService = require(script.Parent.EconomyService)
 local PlacementService = require(script.Parent.PlacementService)
 local GridService = require(script.Parent.GridService)
+local ProgressionService = require(script.Parent.ProgressionService)
 
 type SavedObjectData = {
 	coord: { X: number, Y: number, Z: number },
@@ -16,12 +17,14 @@ type SavedObjectData = {
 
 type PlayerSaveData = {
 	credits: number,
+	unlockedTier: number?,
+	sunkItems: { [string]: number }?,
 	placedObjects: { SavedObjectData },
 }
 
 local SaveService = {}
 
-local DATA_STORE_NAME = "FactoryDataStore_v1"
+local DATA_STORE_NAME = "FactoryDataStore_v2"
 local dataStore = DataStoreService:GetDataStore(DATA_STORE_NAME)
 
 function SaveService.SavePlayerData(player: Player)
@@ -29,13 +32,14 @@ function SaveService.SavePlayerData(player: Player)
 	local key = "FactoryData_" .. userId
 
 	local credits = EconomyService.GetCredits(player)
+	local unlockedTier = ProgressionService.GetUnlockedTier(player)
+	local sunkItems = ProgressionService.GetSunkItems(player)
 	local placedObjects: { SavedObjectData } = {}
 
 	local placedFolder = Workspace:FindFirstChild("PlacedObjects")
 	if placedFolder then
 		for _, child in ipairs(placedFolder:GetChildren()) do
 			if child:IsA("BasePart") then
-				-- Verify player ownership via OwnerUserId attribute
 				local ownerId = child:GetAttribute("OwnerUserId")
 				if ownerId == userId then
 					local nameParts = string.split(child.Name, "_")
@@ -62,6 +66,8 @@ function SaveService.SavePlayerData(player: Player)
 
 	local saveData: PlayerSaveData = {
 		credits = credits,
+		unlockedTier = unlockedTier,
+		sunkItems = sunkItems,
 		placedObjects = placedObjects,
 	}
 
@@ -90,11 +96,15 @@ function SaveService.LoadPlayerData(player: Player)
 			EconomyService.SetCredits(player, data.credits)
 		end
 
+		if typeof(data.unlockedTier) == "number" then
+			ProgressionService.SetProgression(player, data.unlockedTier, data.sunkItems)
+		end
+
 		if typeof(data.placedObjects) == "table" then
 			for _, obj in ipairs(data.placedObjects) do
 				if typeof(obj.coord) == "table" and typeof(obj.category) == "string" and typeof(obj.orientation) == "number" then
 					local coord = Vector3int16.new(obj.coord.X, obj.coord.Y, obj.coord.Z)
-					PlacementService.OnPlaceObjectRequest(player, coord, obj.category :: any, obj.orientation, true) -- bypassCost = true
+					PlacementService.OnPlaceObjectRequest(player, coord, obj.category :: any, obj.orientation, true)
 				end
 			end
 		end

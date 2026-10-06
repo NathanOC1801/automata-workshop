@@ -9,6 +9,8 @@ local Recipes = require(ReplicatedStorage.Shared.Config.Recipes)
 local GridService = require(script.Parent.GridService)
 local ConveyorService = require(script.Parent.ConveyorService)
 local EconomyService = require(script.Parent.EconomyService)
+local ProgressionService = require(script.Parent.ProgressionService)
+local Network = require(ReplicatedStorage.Shared.Network)
 
 export type MachineInstance = {
 	coord: Vector3int16,
@@ -16,6 +18,7 @@ export type MachineInstance = {
 	orientation: number,
 	timer: number,
 	recipe: Types.Recipe?,
+	selectedRecipeId: string?,
 	outputBuffer: string?,
 	inputBuffer: { [string]: number },
 	splitterIndex: number, -- 1 = Front, 2 = Left, 3 = Right
@@ -78,6 +81,7 @@ function MachineService.CreateMachine(coord: Vector3int16, category: Types.Machi
 		orientation = orientation,
 		timer = 0,
 		recipe = nil,
+		selectedRecipeId = nil,
 		outputBuffer = nil,
 		inputBuffer = {},
 		splitterIndex = 1,
@@ -283,14 +287,27 @@ function MachineService.StepMachines(dt: number)
 					machine.timer = 0
 				end
 			elseif machine.outputBuffer == nil then
-				-- Check if any Assembler recipe is satisfied by inputBuffer
-				for _, recipe in pairs(Recipes) do
-					if recipe.machineType == "Assembler" then
-						if checkRecipeSatisfied(machine, recipe) then
-							consumeRecipeIngredients(machine, recipe)
-							machine.recipe = recipe
-							machine.timer = 0
-							break
+				-- Check explicitly configured selectedRecipeId first, or fallback to available satisfying recipe
+				local targetRecipe: Types.Recipe? = nil
+				if machine.selectedRecipeId and Recipes[machine.selectedRecipeId] then
+					targetRecipe = Recipes[machine.selectedRecipeId]
+				end
+
+				if targetRecipe and targetRecipe.machineType == "Assembler" then
+					if checkRecipeSatisfied(machine, targetRecipe) then
+						consumeRecipeIngredients(machine, targetRecipe)
+						machine.recipe = targetRecipe
+						machine.timer = 0
+					end
+				else
+					for _, recipe in pairs(Recipes) do
+						if recipe.machineType == "Assembler" then
+							if checkRecipeSatisfied(machine, recipe) then
+								consumeRecipeIngredients(machine, recipe)
+								machine.recipe = recipe
+								machine.timer = 0
+								break
+							end
 						end
 					end
 				end
@@ -419,11 +436,52 @@ function MachineService.StepMachines(dt: number)
 
 					for _, player in ipairs(Players:GetPlayers()) do
 						EconomyService.AddCredits(player, 10)
+						ProgressionService.ProcessSinkConsumption(player, consumedItem)
 					end
 				end
 			end
 		end
 	end
+end
+
+function MachineService.Init()
+	Network.Remotes.GetMachineState.OnServerInvoke = function(player, coord)
+		if typeof(coord) == "Vector3int16" then
+			local machine = MachineService.GetMachine(coord)
+			if machine then
+				local status = "Idle"
+				local progress = 0.0
+				if machine.recipe ~= nil then
+					status = "Crafting..."
+					progress = math.clamp(machine.timer / machine.recipe.craftDuration, 0, 1)
+				elseif machine.outputBuffer ~= nil then
+					status = "Output Full"
+					progress = 1.0
+				end
+
+				return {
+					category = machine.category,
+					status = status,
+					progress = progress,
+					recipe = (machine.recipe and machine.recipe.displayName) or (machine.selectedRecipeId and Recipes[machine.selectedRecipeId] and Recipes[machine.selectedRecipeId].displayName) or "None",
+					inputBuffer = machine.inputBuffer,
+					storageCount = #machine.storageQueue,
+				}
+			end
+		end
+		return nil
+	end
+
+	Network.Remotes.SelectRecipe.OnServerEvent:Connect(function(player, coord, recipeId)
+		if typeof(coord) == "Vector3int16" and typeof(recipeId) == "string" then
+			local machine = MachineService.GetMachine(coord)
+			if machine and machine.category == "Assembler" then
+				if Recipes[recipeId] then
+					machine.selectedRecipeId = recipeId
+				end
+			end
+		end
+	end)
 end
 
 return MachineService
