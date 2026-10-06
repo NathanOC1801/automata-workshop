@@ -83,7 +83,7 @@ function MachineService.CreateMachine(coord: Vector3int16, category: Types.Machi
 		timer = 0,
 		recipe = nil,
 		selectedRecipeId = nil,
-		selectedResource = category == "Drill" and "RawIron" or nil,
+		selectedResource = nil,
 		outputBuffer = nil,
 		inputBuffer = {},
 		splitterIndex = 1,
@@ -184,18 +184,30 @@ function MachineService.StepMachines(dt: number)
 		)
 
 		if machine.category == "Drill" then
-			-- Drill produces selected resource ("RawIron" or "RawCopper") every 2.0s
-			machine.timer += dt
-			if machine.timer >= 2.0 then
-				local frontConveyor = ConveyorService.GetConveyor(frontCoord)
-				if frontConveyor then
-					local slot1 = frontConveyor.slots[1]
-					if slot1.itemId == nil then
-						slot1.itemId = (machine.selectedResource or "RawIron") :: Types.ItemId
-						slot1.progress = 1.0
-						machine.timer = 0
+			local deposit = GridService.GetDepositAt(machine.coord)
+			if deposit == "Iron" then
+				machine.selectedResource = "RawIron"
+			elseif deposit == "Copper" then
+				machine.selectedResource = "RawCopper"
+			else
+				machine.selectedResource = nil
+			end
+
+			if machine.selectedResource ~= nil then
+				machine.timer += dt
+				if machine.timer >= 2.0 then
+					local frontConveyor = ConveyorService.GetConveyor(frontCoord)
+					if frontConveyor then
+						local slot1 = frontConveyor.slots[1]
+						if slot1.itemId == nil then
+							slot1.itemId = machine.selectedResource :: Types.ItemId
+							slot1.progress = 1.0
+							machine.timer = 0
+						end
 					end
 				end
+			else
+				machine.timer = 0
 			end
 
 		elseif machine.category == "Smelter" then
@@ -453,7 +465,12 @@ function MachineService.Init()
 				local status = "Idle"
 				local progress = 0.0
 				if machine.category == "Drill" then
-					status = string.format("Mining: %s", machine.selectedResource == "RawCopper" and "Raw Copper" or "Raw Iron")
+					local deposit = GridService.GetDepositAt(coord)
+					if deposit then
+						status = string.format("Mining: %s Deposit", deposit)
+					else
+						status = "No Deposit Detected"
+					end
 					progress = math.clamp(machine.timer / 2.0, 0, 1)
 				elseif machine.recipe ~= nil then
 					status = "Crafting..."
@@ -468,7 +485,8 @@ function MachineService.Init()
 					status = status,
 					progress = progress,
 					recipe = (machine.recipe and machine.recipe.displayName) or (machine.selectedRecipeId and Recipes[machine.selectedRecipeId] and Recipes[machine.selectedRecipeId].displayName) or "None",
-					selectedResource = machine.selectedResource or "RawIron",
+					selectedRecipeId = machine.selectedRecipeId,
+					selectedResource = machine.selectedResource,
 					inputBuffer = machine.inputBuffer,
 					storageCount = #machine.storageQueue,
 				}
@@ -483,20 +501,24 @@ function MachineService.Init()
 			if machine and machine.category == "Assembler" then
 				if Recipes[recipeId] then
 					machine.selectedRecipeId = recipeId
+					machine.recipe = nil
+					machine.inputBuffer = {}
+					machine.timer = 0
 				end
 			end
 		end
 	end)
 
-	Network.Remotes.SetMachineRecipe.OnServerEvent:Connect(function(player, coord, resourceId)
-		if typeof(coord) == "Vector3int16" and typeof(resourceId) == "string" then
+	Network.Remotes.ClearBuffer.OnServerEvent:Connect(function(player, coord)
+		if typeof(coord) == "Vector3int16" then
 			local machine = MachineService.GetMachine(coord)
-			if machine and machine.category == "Drill" then
-				if resourceId == "RawIron" or resourceId == "RawCopper" then
-					machine.selectedResource = resourceId
-					machine.timer = 0
-					print(string.format("[MachineService] Drill at (%d, %d, %d) set to mine %s", coord.X, coord.Y, coord.Z, resourceId))
-				end
+			if machine then
+				machine.inputBuffer = {}
+				machine.outputBuffer = nil
+				machine.storageQueue = {}
+				machine.recipe = nil
+				machine.timer = 0
+				print(string.format("[MachineService] Cleared buffer for machine at (%d, %d, %d)", coord.X, coord.Y, coord.Z))
 			end
 		end
 	end)

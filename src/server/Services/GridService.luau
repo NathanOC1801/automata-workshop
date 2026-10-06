@@ -12,6 +12,7 @@ export type CellData = {
 local GridService = {}
 
 local cells: { [string]: CellData } = {}
+local deposits: { [string]: "Iron" | "Copper" } = {}
 
 local function coordToKey(coord: Vector3int16): string
 	return string.format("%d,%d,%d", coord.X, coord.Y, coord.Z)
@@ -35,6 +36,16 @@ end
 function GridService.IsCellEmpty(coord: Vector3int16): boolean
 	local key = coordToKey(coord)
 	return cells[key] == nil
+end
+
+function GridService.SetDeposit(coord: Vector3int16, depositType: "Iron" | "Copper")
+	local key = coordToKey(coord)
+	deposits[key] = depositType
+end
+
+function GridService.GetDepositAt(coord: Vector3int16): "Iron" | "Copper" | nil
+	local key = coordToKey(coord)
+	return deposits[key]
 end
 
 return GridService
