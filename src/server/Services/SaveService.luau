@@ -35,22 +35,25 @@ function SaveService.SavePlayerData(player: Player)
 	if placedFolder then
 		for _, child in ipairs(placedFolder:GetChildren()) do
 			if child:IsA("BasePart") then
-				-- Name format: Category_X_Y_Z
-				local nameParts = string.split(child.Name, "_")
-				if #nameParts >= 4 then
-					local category = nameParts[1]
-					local x = tonumber(nameParts[2])
-					local y = tonumber(nameParts[3])
-					local z = tonumber(nameParts[4])
-					if x and y and z then
-						local coord = Vector3int16.new(x, y, z)
-						local cell = GridService.GetCell(coord)
-						local orientation = cell and cell.orientation or 0
-						table.insert(placedObjects, {
-							coord = { X = x, Y = y, Z = z },
-							category = category,
-							orientation = orientation,
-						})
+				-- Verify player ownership via OwnerUserId attribute
+				local ownerId = child:GetAttribute("OwnerUserId")
+				if ownerId == userId then
+					local nameParts = string.split(child.Name, "_")
+					if #nameParts >= 4 then
+						local category = nameParts[1]
+						local x = tonumber(nameParts[2])
+						local y = tonumber(nameParts[3])
+						local z = tonumber(nameParts[4])
+						if x and y and z then
+							local coord = Vector3int16.new(x, y, z)
+							local cell = GridService.GetCell(coord)
+							local orientation = cell and cell.orientation or 0
+							table.insert(placedObjects, {
+								coord = { X = x, Y = y, Z = z },
+								category = category,
+								orientation = orientation,
+							})
+						end
 					end
 				end
 			end

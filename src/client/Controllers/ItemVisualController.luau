@@ -43,16 +43,16 @@ local LOCAL_OFFSETS = {
 	[4] = Vector3.new(0, 0.75, -1.5),
 }
 
--- 0° -> -Z, 90° -> +X, 180° -> +Z, 270° -> -X (Matching Roblox CFrame.Angles(0, rad(deg), 0))
+-- 0° -> -Z, 90° -> -X, 180° -> +Z, 270° -> +X (Matching Roblox CFrame.Angles(0, rad(deg), 0))
 local function getDirectionOffset(orientation: number): Vector3int16
 	if orientation == 0 then
 		return Vector3int16.new(0, 0, -1)
 	elseif orientation == 90 then
-		return Vector3int16.new(1, 0, 0)
+		return Vector3int16.new(-1, 0, 0)
 	elseif orientation == 180 then
 		return Vector3int16.new(0, 0, 1)
 	elseif orientation == 270 then
-		return Vector3int16.new(-1, 0, 0)
+		return Vector3int16.new(1, 0, 0)
 	else
 		return Vector3int16.new(0, 0, -1)
 	end

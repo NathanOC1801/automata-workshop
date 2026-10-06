@@ -26,16 +26,16 @@ local function coordToKey(coord: Vector3int16): string
 	return string.format("%d,%d,%d", coord.X, coord.Y, coord.Z)
 end
 
--- Alignment: 0° -> -Z, 90° -> +X, 180° -> +Z, 270° -> -X (Matching Roblox CFrame.Angles(0, rad(deg), 0))
+-- Alignment: 0° -> -Z, 90° -> -X, 180° -> +Z, 270° -> +X (Matching Roblox CFrame.Angles(0, rad(deg), 0))
 function ConveyorService.GetDirectionOffset(orientation: number): Vector3int16
 	if orientation == 0 then
 		return Vector3int16.new(0, 0, -1)
 	elseif orientation == 90 then
-		return Vector3int16.new(1, 0, 0)
+		return Vector3int16.new(-1, 0, 0)
 	elseif orientation == 180 then
 		return Vector3int16.new(0, 0, 1)
 	elseif orientation == 270 then
-		return Vector3int16.new(-1, 0, 0)
+		return Vector3int16.new(1, 0, 0)
 	else
 		return Vector3int16.new(0, 0, -1)
 	end
