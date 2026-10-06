@@ -66,6 +66,12 @@ local function createNeonPort(parentPart: BasePart, isOutput: boolean, size: Vec
 	return port
 end
 
+-- 0° -> -Z, 90° -> -X, 180° -> +Z, 270° -> +X
+local function getForwardVector(orientation: number): Vector3
+	local rad = math.rad(orientation)
+	return Vector3.new(-math.sin(rad), 0, -math.cos(rad))
+end
+
 function PlacementService.OnPlaceObjectRequest(
 	player: Player,
 	coord: Vector3int16,
@@ -127,6 +133,10 @@ function PlacementService.OnPlaceObjectRequest(
 		part.Size = Vector3.new(4, 1, 4)
 		part.Color = Color3.fromRGB(80, 80, 85)
 		heightOffset = 0.5
+
+		-- AssemblyLinearVelocity matching forward direction at 8 studs/sec for conveyor riding physics
+		local fwdVector = getForwardVector(orientation)
+		part.AssemblyLinearVelocity = fwdVector * 8
 
 		table.insert(createdPorts, {
 			port = createNeonPort(part, true, Vector3.new(2.8, 0.05, 0.3)),
