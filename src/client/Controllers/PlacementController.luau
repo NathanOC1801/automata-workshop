@@ -27,6 +27,10 @@ local isCellVacant = true
 local function getGhostSizeAndOffset(category: Types.MachineCategory): (Vector3, number)
 	if category == "Conveyor" then
 		return Vector3.new(4, 1, 4), 0.5
+	elseif category == "Splitter" or category == "Merger" then
+		return Vector3.new(4, 2, 4), 1.0
+	elseif category == "Storage" then
+		return Vector3.new(4, 6, 4), 3.0
 	else
 		return Vector3.new(4, 4, 4), 2.0
 	end
@@ -106,7 +110,7 @@ function PlacementController.TogglePlacementMode()
 	isPlacementActive = not isPlacementActive
 	if isPlacementActive then
 		ghostPart = createGhostPart()
-		print("[PlacementController] Placement mode enabled. Keys 1=Conveyor, 2=Drill, 3=Smelter, 4=Sink. Right-Click/X=Demolish. 'R'=Rotate, 'E'=Toggle.")
+		print("[PlacementController] Placement mode enabled. Keys 1=Conveyor, 2=Drill, 3=Smelter, 4=Splitter, 5=Merger, 6=Storage, 7=Sink. Right-Click/X=Demolish. 'R'=Rotate, 'E'=Toggle.")
 	else
 		destroyGhostPart()
 		print("[PlacementController] Placement mode disabled.")
@@ -144,6 +148,12 @@ function PlacementController.OnInputBegan(input: InputObject, gameProcessed: boo
 	elseif input.KeyCode == Enum.KeyCode.Three then
 		PlacementController.SelectCategory("Smelter")
 	elseif input.KeyCode == Enum.KeyCode.Four then
+		PlacementController.SelectCategory("Splitter")
+	elseif input.KeyCode == Enum.KeyCode.Five then
+		PlacementController.SelectCategory("Merger")
+	elseif input.KeyCode == Enum.KeyCode.Six then
+		PlacementController.SelectCategory("Storage")
+	elseif input.KeyCode == Enum.KeyCode.Seven then
 		PlacementController.SelectCategory("Sink")
 	elseif input.UserInputType == Enum.UserInputType.MouseButton1 then
 		if isPlacementActive and currentGridCoord and isCellVacant then
