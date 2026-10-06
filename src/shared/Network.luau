@@ -58,6 +58,7 @@ local removeObjectRemote = getOrCreateRemoteEvent("RemoveObject", remotesFolder)
 local syncConveyorItemsRemote = getOrCreateRemoteEvent("SyncConveyorItems", remotesFolder)
 local syncCreditsRemote = getOrCreateRemoteEvent("SyncCredits", remotesFolder)
 local milestoneUnlockedRemote = getOrCreateRemoteEvent("MilestoneUnlocked", remotesFolder)
+local milestoneProgressUpdatedRemote = getOrCreateRemoteEvent("MilestoneProgressUpdated", remotesFolder)
 local selectRecipeRemote = getOrCreateRemoteEvent("SelectRecipe", remotesFolder)
 
 local getMachineStateFunction = getOrCreateRemoteFunction("GetMachineState", remotesFolder)
@@ -68,6 +69,7 @@ Network.Remotes = {
 	SyncConveyorItems = syncConveyorItemsRemote,
 	SyncCredits = syncCreditsRemote,
 	MilestoneUnlocked = milestoneUnlockedRemote,
+	MilestoneProgressUpdated = milestoneProgressUpdatedRemote,
 	SelectRecipe = selectRecipeRemote,
 	GetMachineState = getMachineStateFunction,
 }
