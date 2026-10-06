@@ -19,14 +19,17 @@ end
 
 local function createSound(part: BasePart, soundId: string, volume: number): Sound
 	local sound = Instance.new("Sound")
-	sound.SoundId = soundId
+	sound.Name = "MachineHum"
+	sound.SoundId = soundPath
 	sound.Volume = volume
+	sound.PlaybackSpeed = playbackSpeed
 	sound.Looped = true
 	sound.RollOffMode = Enum.RollOffMode.LinearSquare
 	sound.RollOffMinDistance = 6
 	sound.RollOffMaxDistance = 32
 	sound.Parent = part
 	sound:Play()
+
 	return sound
 end
 
@@ -34,12 +37,10 @@ local function handleChildAdded(child: Instance)
 	if child:IsA("BasePart") then
 		local nameParts = string.split(child.Name, "_")
 		local category = nameParts[1]
-		if category == "Conveyor" then
-			activeSounds[child] = createSound(child, "rbxassetid://9114223166", 0.18)
-		elseif category == "Drill" then
-			activeSounds[child] = createSound(child, "rbxassetid://9114223166", 0.20)
-		elseif category == "Smelter" then
-			activeSounds[child] = createSound(child, "rbxassetid://9114223166", 0.22)
+		local cfg = SOUND_CONFIG[category]
+
+		if cfg then
+			activeSounds[child] = createSound(child, cfg.sound, cfg.volume, cfg.playbackSpeed)
 		end
 	end
 end
@@ -56,16 +57,19 @@ local function handleChildRemoved(child: Instance)
 end
 
 function AudioController.Init()
-	startBackgroundMusic()
-
-	local placedFolder = Workspace:WaitForChild("PlacedObjects", 10)
-	if placedFolder then
-		for _, child in ipairs(placedFolder:GetChildren()) do
-			handleChildAdded(child)
+	task.spawn(function()
+		local placedFolder = Workspace:WaitForChild("PlacedObjects", 10)
+		if placedFolder then
+			for _, child in ipairs(placedFolder:GetChildren()) do
+				handleChildAdded(child)
+			end
+			placedFolder.ChildAdded:Connect(handleChildAdded)
+			placedFolder.ChildRemoved:Connect(handleChildRemoved)
+		else
+			warn("[AudioController] PlacedObjects folder was not found within timeout.")
 		end
-		placedFolder.ChildAdded:Connect(handleChildAdded)
-		placedFolder.ChildRemoved:Connect(handleChildRemoved)
-	end
+	end)
+
 	print("[AudioController] Initialized.")
 end
 
