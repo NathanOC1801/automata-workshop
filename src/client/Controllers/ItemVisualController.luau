@@ -58,11 +58,12 @@ local ITEM_STYLES: { [string]: { color: Color3, material: Enum.Material } } = {
 
 local DEFAULT_STYLE = { color = Color3.fromRGB(255, 255, 255), material = Enum.Material.SmoothPlastic }
 
+-- Item Y offset = conveyorTopY (1.0) + itemHalfHeight (0.4) + clearance (0.15) = 1.55 studs
 local LOCAL_OFFSETS = {
-	[1] = Vector3.new(0, 0.75, 1.5),
-	[2] = Vector3.new(0, 0.75, 0.5),
-	[3] = Vector3.new(0, 0.75, -0.5),
-	[4] = Vector3.new(0, 0.75, -1.5),
+	[1] = Vector3.new(0, 1.55, 1.5),
+	[2] = Vector3.new(0, 1.55, 0.5),
+	[3] = Vector3.new(0, 1.55, -0.5),
+	[4] = Vector3.new(0, 1.55, -1.5),
 }
 
 -- 0° -> -Z, 90° -> -X, 180° -> +Z, 270° -> +X (Matching Roblox CFrame.Angles(0, rad(deg), 0))
@@ -113,7 +114,7 @@ local itemFolder = getOrCreateItemFolder()
 local function calculateSlotWorldPosition(coord: Vector3int16, slotIndex: number, orientation: number): Vector3
 	local tileCenter = GridMath.gridToWorld(coord)
 	local conveyorCFrame = CFrame.new(tileCenter) * CFrame.Angles(0, math.rad(orientation), 0)
-	local offset = LOCAL_OFFSETS[slotIndex] or Vector3.new(0, 0.75, 0)
+	local offset = LOCAL_OFFSETS[slotIndex] or Vector3.new(0, 1.55, 0)
 	return (conveyorCFrame * CFrame.new(offset)).Position
 end
 
