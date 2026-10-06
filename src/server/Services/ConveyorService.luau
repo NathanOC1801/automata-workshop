@@ -71,8 +71,23 @@ function ConveyorService.RemoveConveyor(coord: Vector3int16)
 end
 
 function ConveyorService.StepConveyors(dt: number)
-	-- Phase 1: Transfers between adjacent conveyors (Slot 4 -> Target Conveyor Slot 1)
-	-- Run transfers first so Slot 4 items clear before internal slots advance into Slot 4 in the same tick.
+	-- Phase 1: Internal slot advances within each conveyor (slots 3 down to 1)
+	for _, conveyor in pairs(conveyors) do
+		for s = 3, 1, -1 do
+			local currentSlot = conveyor.slots[s]
+			local nextSlot = conveyor.slots[s + 1]
+			if currentSlot.itemId ~= nil and nextSlot.itemId == nil then
+				nextSlot.itemId = currentSlot.itemId
+				nextSlot.progress = 1.0
+				currentSlot.itemId = nil
+				currentSlot.progress = 0.0
+			end
+		end
+	end
+
+	-- Phase 2: Inter-conveyor transfers (Slot 4 -> Target Conveyor Slot 1)
+	-- Running transfers AFTER internal slot advances prevents items transferred into Slot 1
+	-- from double-stepping into Slot 2 during the same tick!
 	for _, conveyor in pairs(conveyors) do
 		local slot4 = conveyor.slots[4]
 		if slot4.itemId ~= nil then
@@ -91,20 +106,6 @@ function ConveyorService.StepConveyors(dt: number)
 					slot4.itemId = nil
 					slot4.progress = 0.0
 				end
-			end
-		end
-	end
-
-	-- Phase 2: Internal slot advances within each conveyor (slots 3 down to 1)
-	for _, conveyor in pairs(conveyors) do
-		for s = 3, 1, -1 do
-			local currentSlot = conveyor.slots[s]
-			local nextSlot = conveyor.slots[s + 1]
-			if currentSlot.itemId ~= nil and nextSlot.itemId == nil then
-				nextSlot.itemId = currentSlot.itemId
-				nextSlot.progress = 1.0
-				currentSlot.itemId = nil
-				currentSlot.progress = 0.0
 			end
 		end
 	end

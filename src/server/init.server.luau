@@ -2,6 +2,9 @@
 
 local RunService = game:GetService("RunService")
 local ConveyorService = require(script.Services.ConveyorService)
+local PlacementService = require(script.Services.PlacementService)
+
+PlacementService.Init()
 
 local TICK_INTERVAL = 0.1 -- 10 Hz simulation tick rate
 local accumulator = 0
@@ -22,7 +25,7 @@ ConveyorService.CreateConveyor(c3Coord, 90)
 c1.slots[1].itemId = "RawIron"
 c1.slots[1].progress = 1.0
 
-print("[Server] Initialized 3-node conveyor chain test. Inserted 'RawIron' into C1 Slot 1.")
+print("[Server] Initialized PlacementService and 3-node conveyor chain test.")
 
 local tickCount = 0
 local MAX_TEST_TICKS = 15
