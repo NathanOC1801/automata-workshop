@@ -93,6 +93,47 @@ local function calculatePreviousSlotWorldPosition(coord: Vector3int16, slotIndex
 	end
 end
 
+local function triggerSmelterPulse(coord: Vector3int16)
+	local placedFolder = Workspace:FindFirstChild("PlacedObjects")
+	if not placedFolder then
+		return
+	end
+	local name = string.format("Smelter_%d_%d_%d", coord.X, coord.Y, coord.Z)
+	local part = placedFolder:FindFirstChild(name)
+	if part then
+		local light = part:FindFirstChild("FurnaceLight")
+		if light and light:IsA("PointLight") then
+			local pulseUp = TweenService:Create(light, TweenInfo.new(0.15), { Brightness = 5 })
+			local pulseDown = TweenService:Create(light, TweenInfo.new(0.15), { Brightness = 0 })
+			pulseUp:Play()
+			pulseUp.Completed:Connect(function()
+				pulseDown:Play()
+			end)
+		end
+	end
+end
+
+local function triggerDrillSquash(coord: Vector3int16)
+	local placedFolder = Workspace:FindFirstChild("PlacedObjects")
+	if not placedFolder then
+		return
+	end
+	local name = string.format("Drill_%d_%d_%d", coord.X, coord.Y, coord.Z)
+	local part = placedFolder:FindFirstChild(name)
+	if part and part:IsA("BasePart") then
+		local originalSize = Vector3.new(4, 4, 4)
+		local squashSize = Vector3.new(4.2, 3.6, 4.2)
+
+		local squashTween = TweenService:Create(part, TweenInfo.new(0.12, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), { Size = squashSize })
+		local restoreTween = TweenService:Create(part, TweenInfo.new(0.12, Enum.EasingStyle.Quad, Enum.EasingDirection.In), { Size = originalSize })
+
+		squashTween:Play()
+		squashTween.Completed:Connect(function()
+			restoreTween:Play()
+		end)
+	end
+end
+
 local function getPartFromPool(): ItemVisualData
 	for _, entry in ipairs(partPool) do
 		if not entry.inUse then
@@ -120,12 +161,6 @@ local function getPartFromPool(): ItemVisualData
 	}
 	table.insert(partPool, newEntry)
 	return newEntry
-end
-
-local function releasePartToPool(entry: ItemVisualData)
-	entry.inUse = false
-	entry.part.Transparency = 1
-	entry.part.CFrame = CFrame.new(0, -1000, 0)
 end
 
 local function fadeAndReleasePart(entry: ItemVisualData)
@@ -162,6 +197,12 @@ function ItemVisualController.OnSyncConveyorItems(payload: { ConveyorItemSyncPay
 			visual.part.Material = style.material
 
 			activeVisuals[key] = visual
+
+			-- Trigger machine flourishes
+			if item.slotIndex == 1 then
+				triggerDrillSquash(item.coord)
+				triggerSmelterPulse(item.coord)
+			end
 		else
 			visual.targetPosition = targetPos
 			local style = ITEM_STYLES[item.itemId] or DEFAULT_STYLE

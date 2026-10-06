@@ -1,6 +1,8 @@
 --!strict
 
+local Workspace = game:GetService("Workspace")
 local Players = game:GetService("Players")
+local TweenService = game:GetService("TweenService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Network = require(ReplicatedStorage.Shared.Network)
 
@@ -11,6 +13,49 @@ local playerGui = player:WaitForChild("PlayerGui")
 
 local screenGui: ScreenGui? = nil
 local creditsLabel: TextLabel? = nil
+
+local previousCredits = 250
+
+local function spawnSinkFlyText(amount: number)
+	local placedFolder = Workspace:FindFirstChild("PlacedObjects")
+	if not placedFolder then
+		return
+	end
+
+	-- Find all active Sink instances to attach a floating fly-text
+	for _, child in ipairs(placedFolder:GetChildren()) do
+		if child:IsA("BasePart") and string.split(child.Name, "_")[1] == "Sink" then
+			local billboard = Instance.new("BillboardGui")
+			billboard.Name = "SinkFlyText"
+			billboard.Size = UDim2.new(0, 100, 0, 40)
+			billboard.StudsOffset = Vector3.new(0, 2.5, 0)
+			billboard.AlwaysOnTop = true
+			billboard.Adornee = child
+
+			local textLabel = Instance.new("TextLabel")
+			textLabel.Size = UDim2.fromScale(1, 1)
+			textLabel.BackgroundTransparency = 1
+			textLabel.Text = string.format("+$%d", amount)
+			textLabel.TextColor3 = Color3.fromRGB(80, 255, 120)
+			textLabel.TextSize = 22
+			textLabel.Font = Enum.Font.SourceSansBold
+			textLabel.Parent = billboard
+
+			billboard.Parent = child
+
+			local tweenInfo = TweenInfo.new(0.8, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+			local posTween = TweenService:Create(billboard, tweenInfo, { StudsOffset = Vector3.new(0, 5.5, 0) })
+			local textTween = TweenService:Create(textLabel, tweenInfo, { TextTransparency = 1 })
+
+			posTween:Play()
+			textTween:Play()
+
+			posTween.Completed:Connect(function()
+				billboard:Destroy()
+			end)
+		end
+	end
+end
 
 local function createHUD()
 	screenGui = Instance.new("ScreenGui")
@@ -44,6 +89,11 @@ local function createHUD()
 end
 
 function EconomyController.UpdateCreditsDisplay(credits: number)
+	if credits > previousCredits then
+		spawnSinkFlyText(credits - previousCredits)
+	end
+	previousCredits = credits
+
 	if creditsLabel then
 		creditsLabel.Text = string.format("Credits: $%d", credits)
 	end
