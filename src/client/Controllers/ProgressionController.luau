@@ -34,10 +34,10 @@ local function createMilestoneHUD()
 	screenGui.Name = "MilestoneHUD"
 	screenGui.ResetOnSpawn = false
 
-	-- Top-Left Positioned Card to eliminate overlap with Top-Right Credits Bar
+	-- Top-Left Positioned Card with dynamic height sizing
 	local card = Instance.new("Frame")
 	card.Name = "MilestoneCard"
-	card.Size = UDim2.new(0, 300, 0, 160)
+	card.Size = UDim2.new(0, 280, 0, 160)
 	card.Position = UDim2.new(0, 20, 0, 16)
 	card.AnchorPoint = Vector2.new(0, 0)
 	card.BackgroundColor3 = Color3.fromRGB(30, 32, 36)
@@ -68,10 +68,16 @@ local function createMilestoneHUD()
 
 	local itemsFrame = Instance.new("Frame")
 	itemsFrame.Name = "ItemsContainer"
-	itemsFrame.Size = UDim2.new(1, -20, 0, 50)
+	itemsFrame.Size = UDim2.new(1, -20, 0, 0)
 	itemsFrame.Position = UDim2.new(0, 10, 0, 42)
 	itemsFrame.BackgroundTransparency = 1
 	itemsFrame.Parent = card
+
+	local itemsLayout = Instance.new("UIListLayout")
+	itemsLayout.FillDirection = Enum.FillDirection.Vertical
+	itemsLayout.SortOrder = Enum.SortOrder.LayoutOrder
+	itemsLayout.Padding = UDim.new(0, 10)
+	itemsLayout.Parent = itemsFrame
 	itemsContainer = itemsFrame
 
 	local credsFrame = Instance.new("Frame")
@@ -95,7 +101,7 @@ local function createMilestoneHUD()
 	creditsLabel = cLabel
 
 	local cBarBg = Instance.new("Frame")
-	cBarBg.Size = UDim2.new(1, 0, 0, 10)
+	cBarBg.Size = UDim2.new(1, 0, 0, 8)
 	cBarBg.Position = UDim2.new(0, 0, 0, 20)
 	cBarBg.BackgroundColor3 = Color3.fromRGB(45, 50, 60)
 	cBarBg.BorderSizePixel = 0
@@ -144,7 +150,7 @@ local function tweenWidth(fillFrame: Frame, scale: number)
 end
 
 function ProgressionController.UpdateHUD(payload: ProgressPayload)
-	if not titleLabel or not itemsContainer or not creditsLabel or not creditsFill then
+	if not titleLabel or not itemsContainer or not creditsLabel or not creditsFill or not creditsContainer or not cardFrame then
 		return
 	end
 
@@ -152,17 +158,20 @@ function ProgressionController.UpdateHUD(payload: ProgressPayload)
 
 	-- Clear item bars
 	for _, child in ipairs(itemsContainer:GetChildren()) do
-		child:Destroy()
+		if child:IsA("Frame") then
+			child:Destroy()
+		end
 	end
 
-	local itemIndex = 0
+	local itemCount = 0
 	for itemId, reqCount in pairs(payload.requiredItems) do
 		local sunk = payload.sunkItems[itemId] or 0
 
 		local itemRow = Instance.new("Frame")
-		itemRow.Size = UDim2.new(1, 0, 0, 40)
-		itemRow.Position = UDim2.new(0, 0, 0, itemIndex * 42)
+		itemRow.Name = itemId .. "Row"
+		itemRow.Size = UDim2.new(1, 0, 0, 32)
 		itemRow.BackgroundTransparency = 1
+		itemRow.LayoutOrder = itemCount
 		itemRow.Parent = itemsContainer
 
 		local lbl = Instance.new("TextLabel")
@@ -176,7 +185,7 @@ function ProgressionController.UpdateHUD(payload: ProgressPayload)
 		lbl.Parent = itemRow
 
 		local barBg = Instance.new("Frame")
-		barBg.Size = UDim2.new(1, 0, 0, 10)
+		barBg.Size = UDim2.new(1, 0, 0, 8)
 		barBg.Position = UDim2.new(0, 0, 0, 20)
 		barBg.BackgroundColor3 = Color3.fromRGB(45, 50, 60)
 		barBg.BorderSizePixel = 0
@@ -197,8 +206,13 @@ function ProgressionController.UpdateHUD(payload: ProgressPayload)
 		flCorner.Parent = fill
 
 		tweenWidth(fill, reqCount > 0 and (sunk / reqCount) or 1)
-		itemIndex += 1
+		itemCount += 1
 	end
+
+	-- Adjust vertical stacking
+	local itemsHeight = itemCount * 42
+	creditsContainer.Position = UDim2.new(0, 10, 0, 42 + itemsHeight)
+	cardFrame.Size = UDim2.new(0, 280, 0, math.max(120, 95 + itemsHeight))
 
 	-- Update credits bar
 	local reqCreds = payload.requiredCredits
