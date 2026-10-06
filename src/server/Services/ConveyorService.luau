@@ -1,18 +1,14 @@
 --!strict
 
-local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Types = require(ReplicatedStorage.Shared.Types)
 local Network = require(ReplicatedStorage.Shared.Network)
 local GridService = require(script.Parent.GridService)
-local MonetizationService = require(script.Parent.MonetizationService)
 
 export type ConveyorCell = {
 	coord: Vector3int16,
 	orientation: number, -- 0, 90, 180, 270
-	ownerUserId: number?,
 	slots: { Types.ConveyorSlot },
-	accumulatedTime: number,
 }
 
 export type ConveyorItemSyncPayload = {
@@ -45,7 +41,7 @@ function ConveyorService.GetDirectionOffset(orientation: number): Vector3int16
 	end
 end
 
-function ConveyorService.CreateConveyor(coord: Vector3int16, orientation: number, ownerUserId: number?): ConveyorCell
+function ConveyorService.CreateConveyor(coord: Vector3int16, orientation: number): ConveyorCell
 	local key = coordToKey(coord)
 	local slots: { Types.ConveyorSlot } = {}
 	for i = 1, 4 do
@@ -59,9 +55,7 @@ function ConveyorService.CreateConveyor(coord: Vector3int16, orientation: number
 	local conveyor: ConveyorCell = {
 		coord = coord,
 		orientation = orientation,
-		ownerUserId = ownerUserId,
 		slots = slots,
-		accumulatedTime = 0,
 	}
 
 	conveyors[key] = conveyor
@@ -88,30 +82,22 @@ end
 function ConveyorService.StepConveyors(dt: number)
 	-- Phase 1: Inter-conveyor transfers (Slot 4 -> Target Conveyor Slot 1)
 	for _, conveyor in pairs(conveyors) do
-		local ownerPlayer = conveyor.ownerUserId and Players:GetPlayerByUserId(conveyor.ownerUserId) or nil
-		local speedMult = MonetizationService.GetPlayerConveyorSpeedMultiplier(ownerPlayer)
-		conveyor.accumulatedTime += dt * speedMult
-
-		if conveyor.accumulatedTime >= 0.1 then
-			conveyor.accumulatedTime -= 0.1
-
-			local slot4 = conveyor.slots[4]
-			if slot4.itemId ~= nil then
-				local dirOffset = ConveyorService.GetDirectionOffset(conveyor.orientation)
-				local targetCoord = Vector3int16.new(
-					conveyor.coord.X + dirOffset.X,
-					conveyor.coord.Y + dirOffset.Y,
-					conveyor.coord.Z + dirOffset.Z
-				)
-				local targetConveyor = ConveyorService.GetConveyor(targetCoord)
-				if targetConveyor then
-					local targetSlot1 = targetConveyor.slots[1]
-					if targetSlot1.itemId == nil then
-						targetSlot1.itemId = slot4.itemId
-						targetSlot1.progress = 1.0
-						slot4.itemId = nil
-						slot4.progress = 0.0
-					end
+		local slot4 = conveyor.slots[4]
+		if slot4.itemId ~= nil then
+			local dirOffset = ConveyorService.GetDirectionOffset(conveyor.orientation)
+			local targetCoord = Vector3int16.new(
+				conveyor.coord.X + dirOffset.X,
+				conveyor.coord.Y + dirOffset.Y,
+				conveyor.coord.Z + dirOffset.Z
+			)
+			local targetConveyor = ConveyorService.GetConveyor(targetCoord)
+			if targetConveyor then
+				local targetSlot1 = targetConveyor.slots[1]
+				if targetSlot1.itemId == nil then
+					targetSlot1.itemId = slot4.itemId
+					targetSlot1.progress = 1.0
+					slot4.itemId = nil
+					slot4.progress = 0.0
 				end
 			end
 		end

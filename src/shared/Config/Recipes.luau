@@ -3,7 +3,6 @@
 local Types = require(script.Parent.Parent.Types)
 
 local Recipes: { [string]: Types.Recipe } = {
-	-- Smelter Recipes
 	SmeltIron = {
 		id = "SmeltIron",
 		displayName = "Smelt Iron Ingot",
@@ -28,68 +27,6 @@ local Recipes: { [string]: Types.Recipe } = {
 		craftDuration = 2.0,
 		machineType = "Smelter",
 	},
-	SmeltTitanium = {
-		id = "SmeltTitanium",
-		displayName = "Smelt Titanium Ingot",
-		inputs = {
-			RawTitanium = 1,
-		},
-		outputs = {
-			TitaniumIngot = 1,
-		},
-		craftDuration = 2.5,
-		machineType = "Smelter",
-	},
-	SmeltCobalt = {
-		id = "SmeltCobalt",
-		displayName = "Smelt Cobalt Ingot",
-		inputs = {
-			RawCobalt = 1,
-		},
-		outputs = {
-			CobaltIngot = 1,
-		},
-		craftDuration = 3.0,
-		machineType = "Smelter",
-	},
-	SmeltGold = {
-		id = "SmeltGold",
-		displayName = "Smelt Gold Bar",
-		inputs = {
-			RawGold = 1,
-		},
-		outputs = {
-			GoldBar = 1,
-		},
-		craftDuration = 3.5,
-		machineType = "Smelter",
-	},
-	CutEmerald = {
-		id = "CutEmerald",
-		displayName = "Thermal Cut Emerald",
-		inputs = {
-			RawEmerald = 1,
-		},
-		outputs = {
-			CutEmerald = 1,
-		},
-		craftDuration = 3.0,
-		machineType = "Smelter",
-	},
-	PolishDiamond = {
-		id = "PolishDiamond",
-		displayName = "Thermal Polish Diamond",
-		inputs = {
-			RawDiamond = 1,
-		},
-		outputs = {
-			PolishedDiamond = 1,
-		},
-		craftDuration = 4.0,
-		machineType = "Smelter",
-	},
-
-	-- Assembler Recipes
 	CraftIronPlate = {
 		id = "CraftIronPlate",
 		displayName = "Iron Plate",
@@ -138,32 +75,6 @@ local Recipes: { [string]: Types.Recipe } = {
 			ReinforcedPlate = 1,
 		},
 		craftDuration = 5.0,
-		machineType = "Assembler",
-	},
-	TitaniumFrame = {
-		id = "TitaniumFrame",
-		displayName = "Titanium Frame",
-		inputs = {
-			TitaniumIngot = 2,
-			ReinforcedPlate = 1,
-		},
-		outputs = {
-			TitaniumFrame = 1,
-		},
-		craftDuration = 4.0,
-		machineType = "Assembler",
-	},
-	SolarCell = {
-		id = "SolarCell",
-		displayName = "Solar Cell",
-		inputs = {
-			Wire = 2,
-			Circuit = 1,
-		},
-		outputs = {
-			SolarCell = 1,
-		},
-		craftDuration = 3.0,
 		machineType = "Assembler",
 	},
 }
