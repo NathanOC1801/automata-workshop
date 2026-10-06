@@ -1,11 +1,33 @@
 --!strict
-
-local Workspace = game:GetService("Workspace")
 local SoundService = game:GetService("SoundService")
+local Workspace = game:GetService("Workspace")
 
 local AudioController = {}
 
 local activeSounds: { [BasePart]: Sound } = {}
+
+local SOUND_CONFIG: { [string]: { sound: string, volume: number, playbackSpeed: number } } = {
+	Conveyor = {
+		sound = "rbxasset://sounds/action_swim.mp3",
+		volume = 0.18,
+		playbackSpeed = 0.65,
+	},
+	Drill = {
+		sound = "rbxasset://sounds/impact_water.mp3",
+		volume = 0.22,
+		playbackSpeed = 0.45,
+	},
+	Smelter = {
+		sound = "rbxasset://sounds/action_footsteps_plastic.mp3",
+		volume = 0.20,
+		playbackSpeed = 0.35,
+	},
+	Assembler = {
+		sound = "rbxasset://sounds/action_swim.mp3",
+		volume = 0.20,
+		playbackSpeed = 0.85,
+	},
+}
 
 local function startBackgroundMusic()
 	local bgm = Instance.new("Sound")
@@ -17,7 +39,7 @@ local function startBackgroundMusic()
 	bgm:Play()
 end
 
-local function createSound(part: BasePart, soundId: string, volume: number): Sound
+local function createSound(part: BasePart, soundPath: string, volume: number, playbackSpeed: number): Sound
 	local sound = Instance.new("Sound")
 	sound.SoundId = soundId
 	sound.Volume = volume
@@ -46,17 +68,28 @@ end
 
 local function handleChildRemoved(child: Instance)
 	if child:IsA("BasePart") and activeSounds[child] then
-		local sound = activeSounds[child]
-		if sound then
-			sound:Stop()
-			sound:Destroy()
-		end
+		activeSounds[child]:Stop()
+		activeSounds[child]:Destroy()
 		activeSounds[child] = nil
 	end
 end
 
 function AudioController.Init()
 	startBackgroundMusic()
+
+	task.spawn(function()
+		local placedFolder = Workspace:WaitForChild("PlacedObjects", 10)
+		if placedFolder then
+			for _, child in ipairs(placedFolder:GetChildren()) do
+				handleChildAdded(child)
+			end
+
+			placedFolder.ChildAdded:Connect(handleChildAdded)
+			placedFolder.ChildRemoved:Connect(handleChildRemoved)
+		else
+			warn("[AudioController] PlacedObjects folder was not found within timeout.")
+		end
+	end)
 
 	local placedFolder = Workspace:WaitForChild("PlacedObjects", 10)
 	if placedFolder then
