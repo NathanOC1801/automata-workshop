@@ -35,12 +35,58 @@ local function getGhostSizeAndOffset(category: Types.MachineCategory): (Vector3,
 	end
 end
 
+local function createNeonPortMarker(parentPart: BasePart, isOutput: boolean, size: Vector3): Part
+	local port = Instance.new("Part")
+	port.Name = isOutput and "OutputPort" or "InputPort"
+	port.Size = size
+	port.Color = isOutput and Color3.fromRGB(0, 255, 100) or Color3.fromRGB(255, 140, 0)
+	port.Material = Enum.Material.Neon
+	port.Anchored = true
+	port.CanCollide = false
+	port.CanTouch = false
+	port.CanQuery = false
+	port.CastShadow = false
+	port.Parent = parentPart
+	return port
+end
+
+local function buildGhostPorts(parentPart: BasePart, category: Types.MachineCategory)
+	for _, child in ipairs(parentPart:GetChildren()) do
+		if child:IsA("BasePart") then
+			child:Destroy()
+		end
+	end
+
+	if category == "Conveyor" then
+		-- Green front output strip (Front / -Z)
+		local frontPort = createNeonPortMarker(parentPart, true, Vector3.new(2.8, 0.05, 0.3))
+		frontPort.CFrame = parentPart.CFrame * CFrame.new(0, 0.51, -1.8)
+
+		-- Orange rear input strip (Rear / +Z)
+		local rearPort = createNeonPortMarker(parentPart, false, Vector3.new(2.8, 0.05, 0.3))
+		rearPort.CFrame = parentPart.CFrame * CFrame.new(0, 0.51, 1.8)
+
+	elseif category == "Assembler" then
+		-- 1 Green Output marker on front face (-Z), Size = (1.6, 0.2, 0.4)
+		local outPort = createNeonPortMarker(parentPart, true, Vector3.new(1.6, 0.2, 0.4))
+		outPort.CFrame = parentPart.CFrame * CFrame.new(0, 0, -2.05)
+
+		-- Dual Orange Input markers on rear face (+Z), Size = (1.2, 0.2, 0.4)
+		local leftIn = createNeonPortMarker(parentPart, false, Vector3.new(1.2, 0.2, 0.4))
+		leftIn.CFrame = parentPart.CFrame * CFrame.new(-1.0, 0, 2.05)
+
+		local rightIn = createNeonPortMarker(parentPart, false, Vector3.new(1.2, 0.2, 0.4))
+		rightIn.CFrame = parentPart.CFrame * CFrame.new(1.0, 0, 2.05)
+	end
+end
+
 local function updateGhostAppearance()
 	if not ghostPart then
 		return
 	end
 	local size, _ = getGhostSizeAndOffset(selectedCategory)
 	ghostPart.Size = size
+	buildGhostPorts(ghostPart, selectedCategory)
 end
 
 local function createGhostPart(): Part
@@ -56,6 +102,8 @@ local function createGhostPart(): Part
 	part.Material = Enum.Material.SmoothPlastic
 	part.Color = Color3.fromRGB(0, 255, 0)
 	part.Parent = Workspace
+
+	buildGhostPorts(part, selectedCategory)
 	return part
 end
 
@@ -98,6 +146,9 @@ function PlacementController.RotateOrientation()
 		return
 	end
 	orientation = (orientation + 90) % 360
+	if ghostPart then
+		buildGhostPorts(ghostPart, selectedCategory)
+	end
 end
 
 function PlacementController.SelectCategory(category: Types.MachineCategory)
@@ -152,9 +203,12 @@ function PlacementController.OnRenderStepped()
 	local ray = mouse.UnitRay
 	local raycastParams = RaycastParams.new()
 	raycastParams.FilterType = Enum.RaycastFilterType.Exclude
-	if ghostPart then
-		raycastParams.FilterDescendantsInstances = { ghostPart }
+
+	local excludeList: { Instance } = { ghostPart }
+	if player.Character then
+		table.insert(excludeList, player.Character)
 	end
+	raycastParams.FilterDescendantsInstances = excludeList
 
 	local result = Workspace:Raycast(ray.Origin, ray.Direction * 500, raycastParams)
 	if result and result.Position.Y >= 0 then
@@ -167,6 +221,33 @@ function PlacementController.OnRenderStepped()
 		local posWithOffset = worldPos + Vector3.new(0, heightOffset, 0)
 
 		ghostPart.CFrame = CFrame.new(posWithOffset) * CFrame.Angles(0, math.rad(orientation), 0)
+
+		-- Update child port CFrames for the ghost
+		if selectedCategory == "Conveyor" then
+			local frontPort = ghostPart:FindFirstChild("OutputPort")
+			if frontPort and frontPort:IsA("BasePart") then
+				frontPort.CFrame = ghostPart.CFrame * CFrame.new(0, 0.51, -1.8)
+			end
+			local rearPort = ghostPart:FindFirstChild("InputPort")
+			if rearPort and rearPort:IsA("BasePart") then
+				rearPort.CFrame = ghostPart.CFrame * CFrame.new(0, 0.51, 1.8)
+			end
+		elseif selectedCategory == "Assembler" then
+			local outPort = ghostPart:FindFirstChild("OutputPort")
+			if outPort and outPort:IsA("BasePart") then
+				outPort.CFrame = ghostPart.CFrame * CFrame.new(0, 0, -2.05)
+			end
+			local inputPorts: { BasePart } = {}
+			for _, child in ipairs(ghostPart:GetChildren()) do
+				if child.Name == "InputPort" and child:IsA("BasePart") then
+					table.insert(inputPorts, child)
+				end
+			end
+			if #inputPorts >= 2 then
+				inputPorts[1].CFrame = ghostPart.CFrame * CFrame.new(-1.0, 0, 2.05)
+				inputPorts[2].CFrame = ghostPart.CFrame * CFrame.new(1.0, 0, 2.05)
+			end
+		end
 
 		isCellVacant = checkCellVacant(gridCoord)
 		if isCellVacant then

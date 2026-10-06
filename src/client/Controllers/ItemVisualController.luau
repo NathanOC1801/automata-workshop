@@ -2,6 +2,7 @@
 
 local Workspace = game:GetService("Workspace")
 local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Types = require(ReplicatedStorage.Shared.Types)
@@ -97,6 +98,7 @@ local function getPartFromPool(): ItemVisualData
 		if not entry.inUse then
 			entry.inUse = true
 			entry.part.Transparency = 0
+			entry.part.Size = Vector3.new(0.8, 0.8, 0.8)
 			return entry
 		end
 	end
@@ -124,6 +126,19 @@ local function releasePartToPool(entry: ItemVisualData)
 	entry.inUse = false
 	entry.part.Transparency = 1
 	entry.part.CFrame = CFrame.new(0, -1000, 0)
+end
+
+local function fadeAndReleasePart(entry: ItemVisualData)
+	entry.inUse = false
+	local tweenInfo = TweenInfo.new(0.18, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+	local tween = TweenService:Create(entry.part, tweenInfo, {
+		Size = Vector3.new(0.01, 0.01, 0.01),
+		Transparency = 1,
+	})
+	tween:Play()
+	tween.Completed:Connect(function()
+		entry.part.CFrame = CFrame.new(0, -1000, 0)
+	end)
 end
 
 function ItemVisualController.OnSyncConveyorItems(payload: { ConveyorItemSyncPayload })
@@ -155,22 +170,24 @@ function ItemVisualController.OnSyncConveyorItems(payload: { ConveyorItemSyncPay
 		end
 	end
 
-	-- Clean up visuals for slots that are no longer occupied
+	-- Clean up visuals for slots that are no longer occupied with a smooth shrink/fade
 	for key, visual in pairs(activeVisuals) do
 		if not seenKeys[key] then
-			releasePartToPool(visual)
+			fadeAndReleasePart(visual)
 			activeVisuals[key] = nil
 		end
 	end
 end
 
 function ItemVisualController.OnRenderStepped(dt: number)
-	local lerpFactor = math.clamp(dt * 18, 0, 1)
+	-- Smooth dt * 14 lerp alpha with subtle mechanical settling bob
+	local lerpFactor = math.clamp(dt * 14, 0, 1)
 	for _, visual in pairs(activeVisuals) do
 		if visual.inUse then
 			local currentPos = visual.part.Position
-			local newPos = currentPos:Lerp(visual.targetPosition, lerpFactor)
-			visual.part.CFrame = CFrame.new(newPos)
+			local bobOffsetY = math.sin(os.clock() * 16 + (currentPos.X + currentPos.Z)) * 0.02
+			local lerpedPos = currentPos:Lerp(visual.targetPosition, lerpFactor)
+			visual.part.CFrame = CFrame.new(lerpedPos + Vector3.new(0, bobOffsetY, 0))
 		end
 	end
 end

@@ -38,15 +38,18 @@ end
 
 local placedObjectsFolder = getOrCreatePlacedObjectsFolder()
 
--- Flush 3D neon port markers
-local function createNeonPort(parentPart: BasePart, isOutput: boolean): Part
+-- Flush 3D neon port markers using Enum.Material.Neon
+local function createNeonPort(parentPart: BasePart, isOutput: boolean, size: Vector3?): Part
 	local port = Instance.new("Part")
 	port.Name = isOutput and "OutputPort" or "InputPort"
-	port.Size = Vector3.new(1.5, 1.5, 0.2)
+	port.Size = size or Vector3.new(1.5, 1.5, 0.2)
 	port.Color = isOutput and Color3.fromRGB(0, 255, 100) or Color3.fromRGB(255, 140, 0)
 	port.Material = Enum.Material.Neon
 	port.Anchored = true
 	port.CanCollide = false
+	port.CanTouch = false
+	port.CanQuery = false
+	port.CastShadow = false
 	port.Parent = parentPart
 	return port
 end
@@ -64,7 +67,7 @@ function PlacementService.OnPlaceObjectRequest(
 		return
 	end
 
-	-- Check placement cost unless bypassed (e.g. during SaveService load)
+	-- Check placement cost unless bypassed
 	if not bypassCost then
 		local cost = PLACEMENT_COSTS[category] or 10
 		if not EconomyService.DeductCredits(player, cost) then
@@ -105,6 +108,19 @@ function PlacementService.OnPlaceObjectRequest(
 		part.Size = Vector3.new(4, 1, 4)
 		part.Color = Color3.fromRGB(80, 80, 85)
 		heightOffset = 0.5
+
+		-- Conveyor 3D flush top surface strips:
+		-- Output strip (Front / -Z): Size = (2.8, 0.05, 0.3), Offset = (0, 0.51, -1.8), Color = Green
+		-- Input strip (Rear / +Z): Size = (2.8, 0.05, 0.3), Offset = (0, 0.51, 1.8), Color = Orange
+		table.insert(createdPorts, {
+			port = createNeonPort(part, true, Vector3.new(2.8, 0.05, 0.3)),
+			offset = Vector3.new(0, 0.51, -1.8),
+		})
+		table.insert(createdPorts, {
+			port = createNeonPort(part, false, Vector3.new(2.8, 0.05, 0.3)),
+			offset = Vector3.new(0, 0.51, 1.8),
+		})
+
 	elseif category == "Drill" then
 		part.Size = Vector3.new(4, 4, 4)
 		part.Color = Color3.fromRGB(180, 90, 40)
@@ -158,9 +174,20 @@ function PlacementService.OnPlaceObjectRequest(
 		part.Material = Enum.Material.SmoothPlastic
 		heightOffset = 2.0
 
-		table.insert(createdPorts, { port = createNeonPort(part, false), offset = Vector3.new(-1.0, 0, 2.01) })
-		table.insert(createdPorts, { port = createNeonPort(part, false), offset = Vector3.new(1.0, 0, 2.01) })
-		table.insert(createdPorts, { port = createNeonPort(part, true), offset = Vector3.new(0, 0, -2.01) })
+		-- Output: 1 Green Output port on front face (-Z), Size = (1.6, 0.2, 0.4)
+		table.insert(createdPorts, {
+			port = createNeonPort(part, true, Vector3.new(1.6, 0.2, 0.4)),
+			offset = Vector3.new(0, 0, -2.01),
+		})
+		-- Dual Inputs: 2 Orange Input ports on rear face (+Z), Size = (1.2, 0.2, 0.4)
+		table.insert(createdPorts, {
+			port = createNeonPort(part, false, Vector3.new(1.2, 0.2, 0.4)),
+			offset = Vector3.new(-1.0, 0, 2.01),
+		})
+		table.insert(createdPorts, {
+			port = createNeonPort(part, false, Vector3.new(1.2, 0.2, 0.4)),
+			offset = Vector3.new(1.0, 0, 2.01),
+		})
 
 	elseif category == "Splitter" then
 		part.Size = Vector3.new(4, 2, 4)
