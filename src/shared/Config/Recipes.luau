@@ -29,7 +29,7 @@ local Recipes: { [string]: Types.Recipe } = {
 	},
 	CraftIronPlate = {
 		id = "CraftIronPlate",
-		displayName = "Craft Iron Plate",
+		displayName = "Iron Plate",
 		inputs = {
 			IronIngot = 2,
 		},
@@ -41,9 +41,9 @@ local Recipes: { [string]: Types.Recipe } = {
 	},
 	CraftWire = {
 		id = "CraftWire",
-		displayName = "Craft Copper Wire",
+		displayName = "Copper Wire",
 		inputs = {
-			CopperIngot = 1,
+			CopperIngot = 2,
 		},
 		outputs = {
 			Wire = 2,
@@ -53,7 +53,7 @@ local Recipes: { [string]: Types.Recipe } = {
 	},
 	Circuit = {
 		id = "Circuit",
-		displayName = "Craft Circuit",
+		displayName = "Circuit",
 		inputs = {
 			IronPlate = 1,
 			Wire = 2,
@@ -61,20 +61,20 @@ local Recipes: { [string]: Types.Recipe } = {
 		outputs = {
 			Circuit = 1,
 		},
-		craftDuration = 3.0,
+		craftDuration = 4.0,
 		machineType = "Assembler",
 	},
 	ReinforcedPlate = {
 		id = "ReinforcedPlate",
-		displayName = "Craft Reinforced Plate",
+		displayName = "Reinforced Plate",
 		inputs = {
-			IronIngot = 2,
-			CopperIngot = 1,
+			IronPlate = 2,
+			Wire = 2,
 		},
 		outputs = {
 			ReinforcedPlate = 1,
 		},
-		craftDuration = 4.0,
+		craftDuration = 5.0,
 		machineType = "Assembler",
 	},
 }

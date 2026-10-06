@@ -18,37 +18,39 @@ export type Milestone = {
 local Milestones: { [number]: Milestone } = {
 	[1] = {
 		tier = 1,
-		name = "Basic Automation",
-		description = "Starter tools and basic logistics",
+		name = "Base Automation",
+		description = "Starter extraction and logistics tools",
 		requirement = {
 			credits = 0,
 			items = {},
 		},
-		unlocks = { "Basic Drills", "Conveyors", "Smelters", "Splitters", "Mergers", "Sinks" },
+		unlocks = { "Conveyor", "Drill", "Smelter", "Splitter", "Merger", "Storage", "Sink" },
 	},
 	[2] = {
 		tier = 2,
-		name = "Advanced Logistics",
-		description = "Higher efficiency extraction and transport",
+		name = "Assembly & Circuitry",
+		description = "Unlocks Assembler machine and intermediate components",
 		requirement = {
-			credits = 50,
+			credits = 150,
 			items = {
-				IronPlate = 10,
+				IronIngot = 25,
+				CopperIngot = 25,
 			},
 		},
-		unlocks = { "Fast Conveyor (2x speed)", "Tier 2 Drill (2x extraction rate)" },
+		unlocks = { "Assembler Machine", "Wire Recipe", "IronPlate Recipe", "Circuit Recipe" },
 	},
 	[3] = {
 		tier = 3,
-		name = "Circuitry & Automation",
-		description = "Advanced electronic manufacturing and sorting",
+		name = "Heavy Manufacturing",
+		description = "Unlocks advanced composite components and high tier extraction",
 		requirement = {
-			credits = 200,
+			credits = 400,
 			items = {
-				Circuit = 5,
+				IronPlate = 15,
+				Circuit = 10,
 			},
 		},
-		unlocks = { "Fast Smelter", "Multi-Item Sorter" },
+		unlocks = { "ReinforcedPlate Recipe", "Tier 2 Drill (2x extraction rate)" },
 	},
 }
 

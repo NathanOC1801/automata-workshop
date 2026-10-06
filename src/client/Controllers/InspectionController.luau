@@ -24,10 +24,11 @@ local statusLabel: TextLabel? = nil
 local inputBufferLabel: TextLabel? = nil
 local progressBarFill: Frame? = nil
 local recipeFrame: Frame? = nil
+local clearBufferBtn: TextButton? = nil
 
 local currentInspectedCoord: Vector3int16? = nil
 local pollAccumulator = 0
-local POLL_INTERVAL = 0.2 -- Refresh inspected state every 0.2s
+local POLL_INTERVAL = 0.2
 
 local function createInspectionUI()
 	screenGui = Instance.new("ScreenGui")
@@ -36,8 +37,8 @@ local function createInspectionUI()
 
 	local main = Instance.new("Frame")
 	main.Name = "MainFrame"
-	main.Size = UDim2.new(0, 320, 0, 260)
-	main.Position = UDim2.new(0, 20, 0.5, -130)
+	main.Size = UDim2.new(0, 340, 0, 300)
+	main.Position = UDim2.new(0, 20, 0.5, -150)
 	main.BackgroundColor3 = Color3.fromRGB(25, 28, 35)
 	main.BorderSizePixel = 0
 	main.Visible = false
@@ -49,12 +50,12 @@ local function createInspectionUI()
 
 	local title = Instance.new("TextLabel")
 	title.Name = "Title"
-	title.Size = UDim2.new(1, -40, 0, 35)
+	title.Size = UDim2.new(1, -70, 0, 35)
 	title.Position = UDim2.new(0, 15, 0, 10)
 	title.BackgroundTransparency = 1
 	title.Text = "Machine Inspection"
 	title.TextColor3 = Color3.fromRGB(255, 255, 255)
-	title.TextSize = 20
+	title.TextSize = 18
 	title.Font = Enum.Font.SourceSansBold
 	title.TextXAlignment = Enum.TextXAlignment.Left
 	title.Parent = main
@@ -83,11 +84,11 @@ local function createInspectionUI()
 	local status = Instance.new("TextLabel")
 	status.Name = "Status"
 	status.Size = UDim2.new(1, -30, 0, 25)
-	status.Position = UDim2.new(0, 15, 0, 50)
+	status.Position = UDim2.new(0, 15, 0, 45)
 	status.BackgroundTransparency = 1
 	status.Text = "Status: Idle"
 	status.TextColor3 = Color3.fromRGB(200, 200, 200)
-	status.TextSize = 16
+	status.TextSize = 15
 	status.Font = Enum.Font.SourceSans
 	status.TextXAlignment = Enum.TextXAlignment.Left
 	status.Parent = main
@@ -95,12 +96,12 @@ local function createInspectionUI()
 
 	local inputBuf = Instance.new("TextLabel")
 	inputBuf.Name = "InputBuffer"
-	inputBuf.Size = UDim2.new(1, -30, 0, 40)
-	inputBuf.Position = UDim2.new(0, 15, 0, 80)
+	inputBuf.Size = UDim2.new(1, -30, 0, 35)
+	inputBuf.Position = UDim2.new(0, 15, 0, 72)
 	inputBuf.BackgroundTransparency = 1
 	inputBuf.Text = "Inputs: None"
 	inputBuf.TextColor3 = Color3.fromRGB(180, 220, 255)
-	inputBuf.TextSize = 15
+	inputBuf.TextSize = 14
 	inputBuf.Font = Enum.Font.SourceSans
 	inputBuf.TextXAlignment = Enum.TextXAlignment.Left
 	inputBuf.TextWrapped = true
@@ -110,8 +111,8 @@ local function createInspectionUI()
 	-- Progress Bar Background
 	local barBg = Instance.new("Frame")
 	barBg.Name = "ProgressBarBg"
-	barBg.Size = UDim2.new(1, -30, 0, 20)
-	barBg.Position = UDim2.new(0, 15, 0, 130)
+	barBg.Size = UDim2.new(1, -30, 0, 18)
+	barBg.Position = UDim2.new(0, 15, 0, 110)
 	barBg.BackgroundColor3 = Color3.fromRGB(40, 45, 55)
 	barBg.BorderSizePixel = 0
 	barBg.Parent = main
@@ -132,11 +133,34 @@ local function createInspectionUI()
 	fillCorner.Parent = fill
 	progressBarFill = fill
 
-	-- Recipe / Option Selector Container
+	-- Clear Buffer Button
+	local clearBtn = Instance.new("TextButton")
+	clearBtn.Name = "ClearBufferButton"
+	clearBtn.Size = UDim2.new(0, 100, 0, 22)
+	clearBtn.Position = UDim2.new(1, -115, 0, 134)
+	clearBtn.BackgroundColor3 = Color3.fromRGB(160, 80, 40)
+	clearBtn.Text = "Clear Buffer"
+	clearBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+	clearBtn.Font = Enum.Font.SourceSansBold
+	clearBtn.TextSize = 12
+	clearBtn.Parent = main
+
+	local cBtnCorner = Instance.new("UICorner")
+	cBtnCorner.CornerRadius = UDim.new(0, 4)
+	cBtnCorner.Parent = clearBtn
+
+	clearBtn.MouseButton1Click:Connect(function()
+		if currentInspectedCoord then
+			Network.Remotes.ClearBuffer:FireServer(currentInspectedCoord)
+		end
+	end)
+	clearBufferBtn = clearBtn
+
+	-- Recipe Selector Container
 	local recFrame = Instance.new("Frame")
 	recFrame.Name = "RecipeContainer"
-	recFrame.Size = UDim2.new(1, -30, 0, 80)
-	recFrame.Position = UDim2.new(0, 15, 0, 160)
+	recFrame.Size = UDim2.new(1, -30, 0, 120)
+	recFrame.Position = UDim2.new(0, 15, 0, 165)
 	recFrame.BackgroundTransparency = 1
 	recFrame.Parent = main
 	recipeFrame = recFrame
@@ -145,7 +169,7 @@ local function createInspectionUI()
 	screenGui.Parent = playerGui
 end
 
-local function populateDrillButtons(coord: Vector3int16)
+local function populateRecipeButtons(coord: Vector3int16, selectedRecipeId: string?)
 	if not recipeFrame then
 		return
 	end
@@ -154,81 +178,28 @@ local function populateDrillButtons(coord: Vector3int16)
 	end
 
 	local title = Instance.new("TextLabel")
-	title.Size = UDim2.new(1, 0, 0, 20)
-	title.BackgroundTransparency = 1
-	title.Text = "Select Resource Mode:"
-	title.TextColor3 = Color3.fromRGB(220, 220, 220)
-	title.TextSize = 14
-	title.Font = Enum.Font.SourceSansBold
-	title.TextXAlignment = Enum.TextXAlignment.Left
-	title.Parent = recipeFrame
-
-	local ironBtn = Instance.new("TextButton")
-	ironBtn.Size = UDim2.new(0.48, 0, 0, 30)
-	ironBtn.Position = UDim2.new(0, 0, 0, 25)
-	ironBtn.BackgroundColor3 = Color3.fromRGB(115, 115, 115)
-	ironBtn.Text = "Iron Ore"
-	ironBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-	ironBtn.TextSize = 14
-	ironBtn.Font = Enum.Font.SourceSansBold
-	ironBtn.Parent = recipeFrame
-
-	local btnCorner1 = Instance.new("UICorner")
-	btnCorner1.CornerRadius = UDim.new(0, 4)
-	btnCorner1.Parent = ironBtn
-
-	ironBtn.MouseButton1Click:Connect(function()
-		Network.Remotes.SetMachineRecipe:FireServer(coord, "RawIron")
-	end)
-
-	local copperBtn = Instance.new("TextButton")
-	copperBtn.Size = UDim2.new(0.48, 0, 0, 30)
-	copperBtn.Position = UDim2.new(0.52, 0, 0, 25)
-	copperBtn.BackgroundColor3 = Color3.fromRGB(184, 115, 51)
-	copperBtn.Text = "Copper Ore"
-	copperBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-	copperBtn.TextSize = 14
-	copperBtn.Font = Enum.Font.SourceSansBold
-	copperBtn.Parent = recipeFrame
-
-	local btnCorner2 = Instance.new("UICorner")
-	btnCorner2.CornerRadius = UDim.new(0, 4)
-	btnCorner2.Parent = copperBtn
-
-	copperBtn.MouseButton1Click:Connect(function()
-		Network.Remotes.SetMachineRecipe:FireServer(coord, "RawCopper")
-	end)
-end
-
-local function populateRecipeButtons(coord: Vector3int16)
-	if not recipeFrame then
-		return
-	end
-	for _, child in ipairs(recipeFrame:GetChildren()) do
-		child:Destroy()
-	end
-
-	local title = Instance.new("TextLabel")
-	title.Size = UDim2.new(1, 0, 0, 20)
+	title.Size = UDim2.new(1, 0, 0, 18)
 	title.BackgroundTransparency = 1
 	title.Text = "Select Recipe:"
 	title.TextColor3 = Color3.fromRGB(220, 220, 220)
-	title.TextSize = 14
+	title.TextSize = 13
 	title.Font = Enum.Font.SourceSansBold
 	title.TextXAlignment = Enum.TextXAlignment.Left
 	title.Parent = recipeFrame
 
-	local yOffset = 25
+	local yOffset = 22
 	for recipeId, recipe in pairs(Recipes) do
 		if recipe.machineType == "Assembler" then
 			local btn = Instance.new("TextButton")
 			btn.Size = UDim2.new(1, 0, 0, 22)
 			btn.Position = UDim2.new(0, 0, 0, yOffset)
-			btn.BackgroundColor3 = Color3.fromRGB(50, 75, 110)
-			btn.Text = recipe.displayName
+
+			local isSelected = (selectedRecipeId == recipeId)
+			btn.BackgroundColor3 = isSelected and Color3.fromRGB(0, 160, 90) or Color3.fromRGB(50, 75, 110)
+			btn.Text = string.format("%s (%s)", recipe.displayName, isSelected and "Active" or "Select")
 			btn.TextColor3 = Color3.fromRGB(255, 255, 255)
-			btn.TextSize = 13
-			btn.Font = Enum.Font.SourceSans
+			btn.TextSize = 12
+			btn.Font = Enum.Font.SourceSansBold
 			btn.Parent = recipeFrame
 
 			local btnCorner = Instance.new("UICorner")
@@ -239,7 +210,7 @@ local function populateRecipeButtons(coord: Vector3int16)
 				Network.Remotes.SelectRecipe:FireServer(coord, recipeId)
 			end)
 
-			yOffset += 26
+			yOffset += 24
 		end
 	end
 end
@@ -248,13 +219,14 @@ function InspectionController.InspectMachineAt(coord: Vector3int16)
 	local state = Network.Remotes.GetMachineState:InvokeServer(coord)
 	if state and frame and titleLabel and statusLabel and inputBufferLabel and progressBarFill then
 		currentInspectedCoord = coord
-		titleLabel.Text = string.format("%s Inspection", state.category)
+		titleLabel.Text = string.format("%s Inspection (%d, %d, %d)", state.category, coord.X, coord.Y, coord.Z)
 
 		if state.category == "Drill" then
-			local resourceName = state.selectedResource == "RawCopper" and "Raw Copper" or "Raw Iron"
-			statusLabel.Text = string.format("Current Resource: Mining %s", resourceName)
-			inputBufferLabel.Text = "Mode: Automatic Extraction"
-			populateDrillButtons(coord)
+			statusLabel.Text = string.format("Deposit: %s", state.status)
+			inputBufferLabel.Text = "Mode: Automatic Resource Extraction"
+			if recipeFrame then
+				for _, child in ipairs(recipeFrame:GetChildren()) do child:Destroy() end
+			end
 		else
 			statusLabel.Text = string.format("Status: %s (Recipe: %s)", state.status, state.recipe)
 
@@ -274,12 +246,10 @@ function InspectionController.InspectMachineAt(coord: Vector3int16)
 			end
 			inputBufferLabel.Text = inputStr
 
-			if state.category == "Assembler" and #recipeFrame:GetChildren() == 0 then
-				populateRecipeButtons(coord)
-			elseif state.category ~= "Assembler" and recipeFrame then
-				for _, child in ipairs(recipeFrame:GetChildren()) do
-					child:Destroy()
-				end
+			if state.category == "Assembler" then
+				populateRecipeButtons(coord, state.selectedRecipeId)
+			elseif recipeFrame then
+				for _, child in ipairs(recipeFrame:GetChildren()) do child:Destroy() end
 			end
 		end
 
@@ -330,7 +300,9 @@ function InspectionController.OnRenderStepped(dt: number)
 		pollAccumulator += dt
 		if pollAccumulator >= POLL_INTERVAL then
 			pollAccumulator = 0
-			InspectionController.InspectMachineAt(currentInspectedCoord)
+			task.spawn(function()
+				InspectionController.InspectMachineAt(currentInspectedCoord)
+			end)
 		end
 	end
 end
