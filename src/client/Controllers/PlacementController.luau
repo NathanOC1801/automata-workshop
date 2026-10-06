@@ -32,12 +32,44 @@ local function getGhostSizeAndOffset(category: Types.MachineCategory): (Vector3,
 	end
 end
 
+local function createGhostPort(parentPart: Part, name: string, localPos: Vector3, color: Color3): Part
+	local marker = Instance.new("Part")
+	marker.Name = name
+	marker.Size = Vector3.new(1.6, 0.2, 0.4)
+	marker.Color = color
+	marker.Material = Enum.Material.Neon
+	marker.Transparency = 0.3
+	marker.Anchored = true
+	marker.CanCollide = false
+	marker.CanTouch = false
+	marker.CanQuery = false
+	marker.Parent = parentPart
+	return marker
+end
+
 local function updateGhostAppearance()
 	if not ghostPart then
 		return
 	end
+
 	local size, _ = getGhostSizeAndOffset(selectedCategory)
 	ghostPart.Size = size
+
+	for _, child in ipairs(ghostPart:GetChildren()) do
+		if child:IsA("BasePart") then
+			child:Destroy()
+		end
+	end
+
+	if selectedCategory == "Conveyor" then
+		createGhostPort(ghostPart, "OutputPort", Vector3.new(0, 0.51, -1.8), Color3.fromRGB(0, 255, 100))
+		createGhostPort(ghostPart, "InputPort", Vector3.new(0, 0.51, 1.8), Color3.fromRGB(255, 140, 0))
+	elseif selectedCategory == "Drill" then
+		createGhostPort(ghostPart, "OutputPort", Vector3.new(0, 0, -2.05), Color3.fromRGB(0, 255, 100))
+	elseif selectedCategory == "Smelter" then
+		createGhostPort(ghostPart, "OutputPort", Vector3.new(0, 0, -2.05), Color3.fromRGB(0, 255, 100))
+		createGhostPort(ghostPart, "InputPort", Vector3.new(0, 0, 2.05), Color3.fromRGB(255, 140, 0))
+	end
 end
 
 local function createGhostPart(): Part
@@ -52,22 +84,11 @@ local function createGhostPart(): Part
 	part.Transparency = 0.5
 	part.Material = Enum.Material.SmoothPlastic
 	part.Color = Color3.fromRGB(0, 255, 0)
-
-	local gui = Instance.new("SurfaceGui")
-	gui.Face = Enum.NormalId.Top
-	gui.Parent = part
-	surfaceGui = gui
-
-	local arrowLabel = Instance.new("TextLabel")
-	arrowLabel.Size = UDim2.fromScale(1, 1)
-	arrowLabel.BackgroundTransparency = 1
-	arrowLabel.Text = "▲"
-	arrowLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-	arrowLabel.TextScaled = true
-	arrowLabel.Font = Enum.Font.SourceSansBold
-	arrowLabel.Parent = gui
-
 	part.Parent = Workspace
+
+	ghostPart = part
+	updateGhostAppearance()
+
 	return part
 end
 
@@ -98,7 +119,7 @@ end
 function PlacementController.TogglePlacementMode()
 	isPlacementActive = not isPlacementActive
 	if isPlacementActive then
-		ghostPart = createGhostPart()
+		createGhostPart()
 		print("[PlacementController] Placement mode enabled. Keys 1=Conveyor, 2=Drill, 3=Smelter. 'R' rotate, 'E' toggle.")
 	else
 		destroyGhostPart()
@@ -153,9 +174,9 @@ function PlacementController.OnRenderStepped()
 	raycastParams.FilterType = Enum.RaycastFilterType.Exclude
 
 	local ignoreList = { ghostPart }
-	local player = game:GetService("Players").LocalPlayer
-	if player and player.Character then
-		table.insert(ignoreList, player.Character)
+	local playerChar = Players.LocalPlayer and Players.LocalPlayer.Character
+	if playerChar then
+		table.insert(ignoreList, playerChar)
 	end
 	raycastParams.FilterDescendantsInstances = ignoreList
 
@@ -171,6 +192,24 @@ function PlacementController.OnRenderStepped()
 
 		ghostPart.CFrame = CFrame.new(posWithOffset) * CFrame.Angles(0, math.rad(orientation), 0)
 
+		-- Update port positions relative to ghostPart
+		for _, marker in ipairs(ghostPart:GetChildren()) do
+			if marker:IsA("BasePart") then
+				local isConveyor = (selectedCategory == "Conveyor")
+				local y = isConveyor and 0.51 or 0
+				local z = 0
+
+				if marker.Name == "OutputPort" then
+					z = isConveyor and -1.8 or -2.05
+				elseif marker.Name == "InputPort" then
+					z = isConveyor and 1.8 or 2.05
+				end
+
+				marker.CFrame = ghostPart.CFrame * CFrame.new(0, y, z)
+				marker.Transparency = 0.2
+			end
+		end
+
 		isCellVacant = checkCellVacant(gridCoord)
 		if isCellVacant then
 			ghostPart.Color = Color3.fromRGB(0, 255, 0)
@@ -178,14 +217,14 @@ function PlacementController.OnRenderStepped()
 			ghostPart.Color = Color3.fromRGB(255, 0, 0)
 		end
 		ghostPart.Transparency = 0.5
-		if surfaceGui then
-			surfaceGui.Enabled = true
-		end
 	else
 		currentGridCoord = nil
 		ghostPart.Transparency = 1.0
-		if surfaceGui then
-			surfaceGui.Enabled = false
+
+		for _, marker in ipairs(ghostPart:GetChildren()) do
+			if marker:IsA("BasePart") then
+				marker.Transparency = 1.0
+			end
 		end
 	end
 end

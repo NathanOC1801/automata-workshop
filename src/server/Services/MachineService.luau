@@ -28,11 +28,11 @@ function MachineService.GetForwardOffset(orientation: number): Vector3int16
 	if orientation == 0 then
 		return Vector3int16.new(0, 0, -1)
 	elseif orientation == 90 then
-		return Vector3int16.new(1, 0, 0)
+		return Vector3int16.new(-1, 0, 0)
 	elseif orientation == 180 then
 		return Vector3int16.new(0, 0, 1)
 	elseif orientation == 270 then
-		return Vector3int16.new(-1, 0, 0)
+		return Vector3int16.new(1, 0, 0)
 	else
 		return Vector3int16.new(0, 0, -1)
 	end
@@ -103,8 +103,17 @@ function MachineService.StepMachines(dt: number)
 					if slot1.itemId == nil then
 						slot1.itemId = "RawIron"
 						slot1.progress = 1.0
-						machine.timer = 0 -- reset timer on successful ejection
+						machine.timer = 0
+						print(string.format("[Drill Debug] Ejected RawIron into Conveyor at (%d, %d, %d)", frontCoord.X, frontCoord.Y, frontCoord.Z))
+					else
+						-- Slot 1 is blocked/occupied
 					end
+				else
+					print(string.format("[Drill Debug] Waiting... No conveyor found at frontCoord: (%d, %d, %d). Drill is at (%d, %d, %d) rot: %d", 
+						frontCoord.X, frontCoord.Y, frontCoord.Z, 
+						machine.coord.X, machine.coord.Y, machine.coord.Z, 
+						machine.orientation
+					))
 				end
 			end
 

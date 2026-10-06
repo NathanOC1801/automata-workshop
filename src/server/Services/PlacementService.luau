@@ -86,19 +86,38 @@ function PlacementService.OnPlaceObjectRequest(
 	local posWithOffset = worldPos + Vector3.new(0, heightOffset, 0)
 	part.CFrame = CFrame.new(posWithOffset) * CFrame.Angles(0, math.rad(orientation), 0)
 
-	-- Top directional arrow GUI
-	local surfaceGui = Instance.new("SurfaceGui")
-	surfaceGui.Face = Enum.NormalId.Top
-	surfaceGui.Parent = part
+	--- Helper to create flush directional port markers
+	local function createPortMarker(name: string, localPos: Vector3, color: Color3)
+		local marker = Instance.new("Part")
+		marker.Name = name
+		marker.Size = Vector3.new(1.6, 0.2, 0.4)
+		marker.Color = color
+		marker.Material = Enum.Material.Neon
+		marker.Anchored = true
+		marker.CanCollide = false
+		marker.CanTouch = false
+		marker.CanQuery = false
+		marker.CastShadow = false
+		marker.CFrame = part.CFrame * CFrame.new(localPos)
+		marker.Parent = part
+	end
 
-	local arrowLabel = Instance.new("TextLabel")
-	arrowLabel.Size = UDim2.fromScale(1, 1)
-	arrowLabel.BackgroundTransparency = 1
-	arrowLabel.Text = "▲"
-	arrowLabel.TextColor3 = Color3.fromRGB(255, 255, 0)
-	arrowLabel.TextScaled = true
-	arrowLabel.Font = Enum.Font.SourceSansBold
-	arrowLabel.Parent = surfaceGui
+	-- Add distinct Input (Orange) and Output (Bright Green) ports
+	if category == "Conveyor" then
+		-- Output port (Front edge, -Z)
+		createPortMarker("OutputPort", Vector3.new(0, 0.51, -1.8), Color3.fromRGB(0, 255, 100))
+		-- Input port (Back edge, +Z)
+		createPortMarker("InputPort", Vector3.new(0, 0.51, 1.8), Color3.fromRGB(255, 140, 0))
+	elseif category == "Drill" then
+		-- Drill only produces: Output port on the front face (-Z)
+		createPortMarker("OutputPort", Vector3.new(0, 0, -2.05), Color3.fromRGB(0, 255, 100))
+	elseif category == "Smelter" then
+		-- Smelter has Input at the back (+Z) and Output at the front (-Z)
+		createPortMarker("OutputPort", Vector3.new(0, 0, -2.05), Color3.fromRGB(0, 255, 100))
+		createPortMarker("InputPort", Vector3.new(0, 0, 2.05), Color3.fromRGB(255, 140, 0))
+	end
+
+	part.Parent = placedObjectsFolder
 
 	part.Parent = placedObjectsFolder
 	print(string.format("[PlacementService] Successfully placed %s at (%d, %d, %d)", category, coord.X, coord.Y, coord.Z))
