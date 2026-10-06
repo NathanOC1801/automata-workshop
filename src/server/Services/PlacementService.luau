@@ -11,6 +11,7 @@ local GridService = require(script.Parent.GridService)
 local ConveyorService = require(script.Parent.ConveyorService)
 local MachineService = require(script.Parent.MachineService)
 local EconomyService = require(script.Parent.EconomyService)
+local ProgressionService = require(script.Parent.ProgressionService)
 
 local PlacementService = {}
 
@@ -23,6 +24,17 @@ local PLACEMENT_COSTS: { [Types.MachineCategory]: number } = {
 	Storage = 40,
 	Sink = 20,
 	Assembler = 100,
+}
+
+local TIER_REQUIREMENTS: { [Types.MachineCategory]: number } = {
+	Conveyor = 1,
+	Drill = 1,
+	Smelter = 1,
+	Splitter = 1,
+	Merger = 1,
+	Storage = 1,
+	Sink = 1,
+	Assembler = 2,
 }
 
 local function getOrCreatePlacedObjectsFolder(): Folder
@@ -67,8 +79,15 @@ function PlacementService.OnPlaceObjectRequest(
 		return
 	end
 
-	-- Check placement cost unless bypassed
+	-- Check tier permission & placement cost unless bypassed (e.g. during SaveService load)
 	if not bypassCost then
+		local requiredTier = TIER_REQUIREMENTS[category] or 1
+		local playerTier = ProgressionService.GetUnlockedTier(player)
+		if playerTier < requiredTier then
+			warn(string.format("[PlacementService] Player %s has not unlocked Tier %d for %s", player.Name, requiredTier, category))
+			return
+		end
+
 		local cost = PLACEMENT_COSTS[category] or 10
 		if not EconomyService.DeductCredits(player, cost) then
 			warn(string.format("[PlacementService] Player %s does not have enough credits for %s ($%d)", player.Name, category, cost))
@@ -109,9 +128,6 @@ function PlacementService.OnPlaceObjectRequest(
 		part.Color = Color3.fromRGB(80, 80, 85)
 		heightOffset = 0.5
 
-		-- Conveyor 3D flush top surface strips:
-		-- Output strip (Front / -Z): Size = (2.8, 0.05, 0.3), Offset = (0, 0.51, -1.8), Color = Green
-		-- Input strip (Rear / +Z): Size = (2.8, 0.05, 0.3), Offset = (0, 0.51, 1.8), Color = Orange
 		table.insert(createdPorts, {
 			port = createNeonPort(part, true, Vector3.new(2.8, 0.05, 0.3)),
 			offset = Vector3.new(0, 0.51, -1.8),
@@ -129,7 +145,6 @@ function PlacementService.OnPlaceObjectRequest(
 
 		table.insert(createdPorts, { port = createNeonPort(part, true), offset = Vector3.new(0, 0, -2.01) })
 
-		-- Drill dust particles
 		local dust = Instance.new("ParticleEmitter")
 		dust.Name = "DustParticles"
 		dust.Color = ColorSequence.new(Color3.fromRGB(160, 140, 120))
@@ -156,7 +171,6 @@ function PlacementService.OnPlaceObjectRequest(
 		light.Brightness = 0
 		light.Parent = part
 
-		-- Smoke particles
 		local smoke = Instance.new("ParticleEmitter")
 		smoke.Name = "SmokeParticles"
 		smoke.Color = ColorSequence.new(Color3.fromRGB(80, 80, 80))
@@ -174,12 +188,10 @@ function PlacementService.OnPlaceObjectRequest(
 		part.Material = Enum.Material.SmoothPlastic
 		heightOffset = 2.0
 
-		-- Output: 1 Green Output port on front face (-Z), Size = (1.6, 0.2, 0.4)
 		table.insert(createdPorts, {
 			port = createNeonPort(part, true, Vector3.new(1.6, 0.2, 0.4)),
 			offset = Vector3.new(0, 0, -2.01),
 		})
-		-- Dual Inputs: 2 Orange Input ports on rear face (+Z), Size = (1.2, 0.2, 0.4)
 		table.insert(createdPorts, {
 			port = createNeonPort(part, false, Vector3.new(1.2, 0.2, 0.4)),
 			offset = Vector3.new(-1.0, 0, 2.01),
@@ -236,7 +248,6 @@ function PlacementService.OnPlaceObjectRequest(
 	local posWithOffset = worldPos + Vector3.new(0, heightOffset, 0)
 	part.CFrame = CFrame.new(posWithOffset) * CFrame.Angles(0, math.rad(orientation), 0)
 
-	-- Position child neon ports cleanly using explicit offsets
 	for _, data in ipairs(createdPorts) do
 		local portCFrame = part.CFrame * CFrame.new(data.offset)
 		if data.yawRad then

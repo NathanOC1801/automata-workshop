@@ -37,17 +37,39 @@ local function getOrCreateRemoteEvent(name: string, parent: Instance): RemoteEve
 	end
 end
 
+local function getOrCreateRemoteFunction(name: string, parent: Instance): RemoteFunction
+	if isServer then
+		local remote = parent:FindFirstChild(name)
+		if not remote then
+			local newRemote = Instance.new("RemoteFunction")
+			newRemote.Name = name
+			newRemote.Parent = parent
+			remote = newRemote
+		end
+		return remote :: RemoteFunction
+	else
+		return parent:WaitForChild(name) :: RemoteFunction
+	end
+end
+
 local remotesFolder = getOrCreateFolder("Remotes", ReplicatedStorage)
 local placeObjectRemote = getOrCreateRemoteEvent("PlaceObject", remotesFolder)
 local removeObjectRemote = getOrCreateRemoteEvent("RemoveObject", remotesFolder)
 local syncConveyorItemsRemote = getOrCreateRemoteEvent("SyncConveyorItems", remotesFolder)
 local syncCreditsRemote = getOrCreateRemoteEvent("SyncCredits", remotesFolder)
+local milestoneUnlockedRemote = getOrCreateRemoteEvent("MilestoneUnlocked", remotesFolder)
+local selectRecipeRemote = getOrCreateRemoteEvent("SelectRecipe", remotesFolder)
+
+local getMachineStateFunction = getOrCreateRemoteFunction("GetMachineState", remotesFolder)
 
 Network.Remotes = {
 	PlaceObject = placeObjectRemote,
 	RemoveObject = removeObjectRemote,
 	SyncConveyorItems = syncConveyorItemsRemote,
 	SyncCredits = syncCreditsRemote,
+	MilestoneUnlocked = milestoneUnlockedRemote,
+	SelectRecipe = selectRecipeRemote,
+	GetMachineState = getMachineStateFunction,
 }
 
 return Network
