@@ -119,10 +119,14 @@ function PlacementController.OnRenderStepped()
 
 	local ray = mouse.UnitRay
 	local raycastParams = RaycastParams.new()
-	raycastParams.FilterType = RaycastFilterType.Exclude
-	if ghostPart then
-		raycastParams.FilterDescendantsInstances = { ghostPart }
+	raycastParams.FilterType = Enum.RaycastFilterType.Exclude
+
+	local ignoreList = { ghostPart }
+	local player = game:GetService("Players").LocalPlayer
+	if player and player.Character then
+		table.insert(ignoreList, player.Character)
 	end
+	raycastParams.FilterDescendantsInstances = ignoreList
 
 	local result = Workspace:Raycast(ray.Origin, ray.Direction * 500, raycastParams)
 	if result and result.Position.Y >= 0 then
