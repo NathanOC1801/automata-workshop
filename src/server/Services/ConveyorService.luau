@@ -26,6 +26,7 @@ local function coordToKey(coord: Vector3int16): string
 	return string.format("%d,%d,%d", coord.X, coord.Y, coord.Z)
 end
 
+-- Alignment: 0° -> -Z, 90° -> +X, 180° -> +Z, 270° -> -X (Matching Roblox CFrame.Angles(0, rad(deg), 0))
 function ConveyorService.GetDirectionOffset(orientation: number): Vector3int16
 	if orientation == 0 then
 		return Vector3int16.new(0, 0, -1)
@@ -80,7 +81,6 @@ end
 
 function ConveyorService.StepConveyors(dt: number)
 	-- Phase 1: Inter-conveyor transfers (Slot 4 -> Target Conveyor Slot 1)
-	-- Process transfers first so Slot 4 empties, allowing internal slots to advance into Slot 4 cleanly.
 	for _, conveyor in pairs(conveyors) do
 		local slot4 = conveyor.slots[4]
 		if slot4.itemId ~= nil then

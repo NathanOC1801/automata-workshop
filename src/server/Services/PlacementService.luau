@@ -38,11 +38,12 @@ end
 
 local placedObjectsFolder = getOrCreatePlacedObjectsFolder()
 
-local function createNeonPort(parentPart: BasePart, localOffset: Vector3, isOutput: boolean): Part
+-- Flush 3D neon port markers
+local function createNeonPort(parentPart: BasePart, isOutput: boolean): Part
 	local port = Instance.new("Part")
 	port.Name = isOutput and "OutputPort" or "InputPort"
-	port.Size = Vector3.new(1.5, 1.5, 0.4)
-	port.Color = isOutput and Color3.fromRGB(0, 255, 120) or Color3.fromRGB(255, 120, 0)
+	port.Size = Vector3.new(1.5, 1.5, 0.2)
+	port.Color = isOutput and Color3.fromRGB(0, 255, 100) or Color3.fromRGB(255, 140, 0)
 	port.Material = Enum.Material.Neon
 	port.Anchored = true
 	port.CanCollide = false
@@ -54,7 +55,8 @@ function PlacementService.OnPlaceObjectRequest(
 	player: Player,
 	coord: Vector3int16,
 	category: Types.MachineCategory,
-	orientation: number
+	orientation: number,
+	bypassCost: boolean?
 )
 	-- Validate target cell is empty
 	if not GridService.IsCellEmpty(coord) then
@@ -62,11 +64,13 @@ function PlacementService.OnPlaceObjectRequest(
 		return
 	end
 
-	-- Check placement cost
-	local cost = PLACEMENT_COSTS[category] or 10
-	if not EconomyService.DeductCredits(player, cost) then
-		warn(string.format("[PlacementService] Player %s does not have enough credits for %s ($%d)", player.Name, category, cost))
-		return
+	-- Check placement cost unless bypassed (e.g. during SaveService load)
+	if not bypassCost then
+		local cost = PLACEMENT_COSTS[category] or 10
+		if not EconomyService.DeductCredits(player, cost) then
+			warn(string.format("[PlacementService] Player %s does not have enough credits for %s ($%d)", player.Name, category, cost))
+			return
+		end
 	end
 
 	-- Register cell in GridService
@@ -75,7 +79,7 @@ function PlacementService.OnPlaceObjectRequest(
 	-- Handle machine logic registration
 	if category == "Conveyor" then
 		ConveyorService.CreateConveyor(coord, orientation)
-	elseif category == "Drill" or category == "Smelter" or category == "Sink" or category == "Splitter" or category == "Merger" or category == "Storage" then
+	elseif category == "Drill" or category == "Smelter" or category == "Sink" or category == "Splitter" or category == "Merger" or category == "Storage" or category == "Assembler" then
 		MachineService.CreateMachine(coord, category, orientation)
 	else
 		GridService.SetCell(coord, {
@@ -89,11 +93,14 @@ function PlacementService.OnPlaceObjectRequest(
 	local worldPos = GridMath.gridToWorld(coord)
 	local part = Instance.new("Part")
 	part.Name = machineId
+	part:SetAttribute("OwnerUserId", player.UserId)
 	part.Anchored = true
 	part.CanCollide = true
 	part.Material = Enum.Material.SmoothPlastic
 
 	local heightOffset = 0.5
+	local createdPorts: { { port: Part, offset: Vector3, yawRad: number? } } = {}
+
 	if category == "Conveyor" then
 		part.Size = Vector3.new(4, 1, 4)
 		part.Color = Color3.fromRGB(80, 80, 85)
@@ -103,15 +110,28 @@ function PlacementService.OnPlaceObjectRequest(
 		part.Color = Color3.fromRGB(180, 90, 40)
 		part.Material = Enum.Material.DiamondPlate
 		heightOffset = 2.0
-		createNeonPort(part, Vector3.new(0, 0, -2), true) -- Front Output
+
+		table.insert(createdPorts, { port = createNeonPort(part, true), offset = Vector3.new(0, 0, -2.01) })
+
+		-- Drill dust particles
+		local dust = Instance.new("ParticleEmitter")
+		dust.Name = "DustParticles"
+		dust.Color = ColorSequence.new(Color3.fromRGB(160, 140, 120))
+		dust.Size = NumberSequence.new(0.5, 1.5)
+		dust.Transparency = NumberSequence.new(0.5, 1.0)
+		dust.Lifetime = NumberRange.new(1.0, 2.0)
+		dust.Rate = 10
+		dust.Speed = NumberRange.new(1, 3)
+		dust.Parent = part
+
 	elseif category == "Smelter" then
 		part.Size = Vector3.new(4, 4, 4)
 		part.Color = Color3.fromRGB(130, 50, 40)
 		part.Material = Enum.Material.Brick
 		heightOffset = 2.0
 
-		createNeonPort(part, Vector3.new(0, 0, 2), false)  -- Back Input
-		createNeonPort(part, Vector3.new(0, 0, -2), true) -- Front Output
+		table.insert(createdPorts, { port = createNeonPort(part, false), offset = Vector3.new(0, 0, 2.01) })
+		table.insert(createdPorts, { port = createNeonPort(part, true), offset = Vector3.new(0, 0, -2.01) })
 
 		local light = Instance.new("PointLight")
 		light.Name = "FurnaceLight"
@@ -119,41 +139,67 @@ function PlacementService.OnPlaceObjectRequest(
 		light.Range = 12
 		light.Brightness = 0
 		light.Parent = part
+
+		-- Smoke particles
+		local smoke = Instance.new("ParticleEmitter")
+		smoke.Name = "SmokeParticles"
+		smoke.Color = ColorSequence.new(Color3.fromRGB(80, 80, 80))
+		smoke.Size = NumberSequence.new(0.8, 2.5)
+		smoke.Transparency = NumberSequence.new(0.3, 1.0)
+		smoke.Lifetime = NumberRange.new(2.0, 3.5)
+		smoke.Rate = 12
+		smoke.Speed = NumberRange.new(2, 5)
+		smoke.Enabled = false
+		smoke.Parent = part
+
+	elseif category == "Assembler" then
+		part.Size = Vector3.new(4, 4, 4)
+		part.Color = Color3.fromRGB(45, 85, 125)
+		part.Material = Enum.Material.SmoothPlastic
+		heightOffset = 2.0
+
+		table.insert(createdPorts, { port = createNeonPort(part, false), offset = Vector3.new(-1.0, 0, 2.01) })
+		table.insert(createdPorts, { port = createNeonPort(part, false), offset = Vector3.new(1.0, 0, 2.01) })
+		table.insert(createdPorts, { port = createNeonPort(part, true), offset = Vector3.new(0, 0, -2.01) })
+
 	elseif category == "Splitter" then
 		part.Size = Vector3.new(4, 2, 4)
 		part.Color = Color3.fromRGB(60, 140, 200)
 		part.Material = Enum.Material.SmoothPlastic
 		heightOffset = 1.0
 
-		createNeonPort(part, Vector3.new(0, 0, 2), false)   -- Back Input
-		createNeonPort(part, Vector3.new(0, 0, -2), true)  -- Front Output
-		createNeonPort(part, Vector3.new(-2, 0, 0), true)  -- Left Output
-		createNeonPort(part, Vector3.new(2, 0, 0), true)   -- Right Output
+		table.insert(createdPorts, { port = createNeonPort(part, false), offset = Vector3.new(0, 0, 2.01) })
+		table.insert(createdPorts, { port = createNeonPort(part, true), offset = Vector3.new(0, 0, -2.01) })
+		table.insert(createdPorts, { port = createNeonPort(part, true), offset = Vector3.new(-2.01, 0, 0), yawRad = math.rad(90) })
+		table.insert(createdPorts, { port = createNeonPort(part, true), offset = Vector3.new(2.01, 0, 0), yawRad = math.rad(90) })
+
 	elseif category == "Merger" then
 		part.Size = Vector3.new(4, 2, 4)
 		part.Color = Color3.fromRGB(180, 140, 50)
 		part.Material = Enum.Material.SmoothPlastic
 		heightOffset = 1.0
 
-		createNeonPort(part, Vector3.new(-2, 0, 0), false) -- Left Input
-		createNeonPort(part, Vector3.new(0, 0, 2), false)  -- Back Input
-		createNeonPort(part, Vector3.new(2, 0, 0), false)  -- Right Input
-		createNeonPort(part, Vector3.new(0, 0, -2), true)  -- Front Output
+		table.insert(createdPorts, { port = createNeonPort(part, false), offset = Vector3.new(-2.01, 0, 0), yawRad = math.rad(90) })
+		table.insert(createdPorts, { port = createNeonPort(part, false), offset = Vector3.new(0, 0, 2.01) })
+		table.insert(createdPorts, { port = createNeonPort(part, false), offset = Vector3.new(2.01, 0, 0), yawRad = math.rad(90) })
+		table.insert(createdPorts, { port = createNeonPort(part, true), offset = Vector3.new(0, 0, -2.01) })
+
 	elseif category == "Storage" then
 		part.Size = Vector3.new(4, 6, 4)
 		part.Color = Color3.fromRGB(70, 75, 80)
 		part.Material = Enum.Material.Metal
 		heightOffset = 3.0
 
-		createNeonPort(part, Vector3.new(0, -1, 2), false)  -- Back Input
-		createNeonPort(part, Vector3.new(0, -1, -2), true) -- Front Output
+		table.insert(createdPorts, { port = createNeonPort(part, false), offset = Vector3.new(0, -1.5, 2.01) })
+		table.insert(createdPorts, { port = createNeonPort(part, true), offset = Vector3.new(0, -1.5, -2.01) })
+
 	elseif category == "Sink" then
 		part.Size = Vector3.new(4, 4, 4)
 		part.Color = Color3.fromRGB(50, 50, 60)
 		part.Material = Enum.Material.SmoothPlastic
 		heightOffset = 2.0
 
-		createNeonPort(part, Vector3.new(0, 0, 2), false) -- Back Input
+		table.insert(createdPorts, { port = createNeonPort(part, false), offset = Vector3.new(0, 0, 2.01) })
 	else
 		part.Size = Vector3.new(4, 4, 4)
 		part.Color = Color3.fromRGB(120, 120, 120)
@@ -163,82 +209,14 @@ function PlacementService.OnPlaceObjectRequest(
 	local posWithOffset = worldPos + Vector3.new(0, heightOffset, 0)
 	part.CFrame = CFrame.new(posWithOffset) * CFrame.Angles(0, math.rad(orientation), 0)
 
-	-- Update child port CFrames relative to part
-	local portOffsets = {
-		{ name = "InputPort", offset = Vector3.new(0, 0, 2) },
-		{ name = "OutputPort", offset = Vector3.new(0, 0, -2) },
-	}
-	if category == "Splitter" then
-		for _, child in ipairs(part:GetChildren()) do
-			if child:IsA("BasePart") then
-				if child.Position == Vector3.zero then
-					-- position child based on local offset
-				end
-			end
+	-- Position child neon ports cleanly using explicit offsets
+	for _, data in ipairs(createdPorts) do
+		local portCFrame = part.CFrame * CFrame.new(data.offset)
+		if data.yawRad then
+			portCFrame = portCFrame * CFrame.Angles(0, data.yawRad, 0)
 		end
+		data.port.CFrame = portCFrame
 	end
-
-	-- Positioning child ports cleanly
-	for _, child in ipairs(part:GetChildren()) do
-		if child:IsA("BasePart") and child ~= part then
-			if category == "Splitter" then
-				if child.Name == "InputPort" then
-					child.CFrame = part.CFrame * CFrame.new(0, 0, 2)
-				elseif child.Name == "OutputPort" then
-					-- Place front, left, right outputs
-					if not part:FindFirstChild("FrontSet") then
-						child.CFrame = part.CFrame * CFrame.new(0, 0, -2)
-						part:SetAttribute("FrontSet", true)
-					elseif not part:FindFirstChild("LeftSet") then
-						child.CFrame = part.CFrame * CFrame.new(-2, 0, 0) * CFrame.Angles(0, math.rad(90), 0)
-						part:SetAttribute("LeftSet", true)
-					else
-						child.CFrame = part.CFrame * CFrame.new(2, 0, 0) * CFrame.Angles(0, math.rad(90), 0)
-					end
-				end
-			elseif category == "Merger" then
-				if child.Name == "OutputPort" then
-					child.CFrame = part.CFrame * CFrame.new(0, 0, -2)
-				elseif child.Name == "InputPort" then
-					if not part:FindFirstChild("LeftInSet") then
-						child.CFrame = part.CFrame * CFrame.new(-2, 0, 0) * CFrame.Angles(0, math.rad(90), 0)
-						part:SetAttribute("LeftInSet", true)
-					elseif not part:FindFirstChild("BackInSet") then
-						child.CFrame = part.CFrame * CFrame.new(0, 0, 2)
-						part:SetAttribute("BackInSet", true)
-					else
-						child.CFrame = part.CFrame * CFrame.new(2, 0, 0) * CFrame.Angles(0, math.rad(90), 0)
-					end
-				end
-			elseif category == "Storage" then
-				if child.Name == "InputPort" then
-					child.CFrame = part.CFrame * CFrame.new(0, -1.5, 2)
-				elseif child.Name == "OutputPort" then
-					child.CFrame = part.CFrame * CFrame.new(0, -1.5, -2)
-				end
-			else
-				if child.Name == "InputPort" then
-					child.CFrame = part.CFrame * CFrame.new(0, 0, 2)
-				elseif child.Name == "OutputPort" then
-					child.CFrame = part.CFrame * CFrame.new(0, 0, -2)
-				end
-			end
-		end
-	end
-
-	-- Top directional arrow GUI
-	local surfaceGui = Instance.new("SurfaceGui")
-	surfaceGui.Face = Enum.NormalId.Top
-	surfaceGui.Parent = part
-
-	local arrowLabel = Instance.new("TextLabel")
-	arrowLabel.Size = UDim2.fromScale(1, 1)
-	arrowLabel.BackgroundTransparency = 1
-	arrowLabel.Text = category == "Sink" and "▼" or "▲"
-	arrowLabel.TextColor3 = category == "Sink" and Color3.fromRGB(255, 120, 0) or Color3.fromRGB(255, 255, 0)
-	arrowLabel.TextScaled = true
-	arrowLabel.Font = Enum.Font.SourceSansBold
-	arrowLabel.Parent = surfaceGui
 
 	part.Parent = placedObjectsFolder
 	print(string.format("[PlacementService] Successfully placed %s at (%d, %d, %d)", category, coord.X, coord.Y, coord.Z))
@@ -256,7 +234,7 @@ function PlacementService.OnRemoveObjectRequest(player: Player, coord: Vector3in
 	-- Unregister logic state
 	if category == "Conveyor" then
 		ConveyorService.RemoveConveyor(coord)
-	elseif category == "Drill" or category == "Smelter" or category == "Sink" or category == "Splitter" or category == "Merger" or category == "Storage" then
+	elseif category == "Drill" or category == "Smelter" or category == "Sink" or category == "Splitter" or category == "Merger" or category == "Storage" or category == "Assembler" then
 		MachineService.RemoveMachine(coord)
 	else
 		GridService.ClearCell(coord)

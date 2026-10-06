@@ -30,6 +30,8 @@ local ITEM_STYLES: { [string]: { color: Color3, material: Enum.Material } } = {
 	CopperIngot = { color = Color3.fromRGB(220, 130, 60), material = Enum.Material.Metal },
 	IronPlate = { color = Color3.fromRGB(160, 165, 170), material = Enum.Material.CorrodedMetal },
 	Wire = { color = Color3.fromRGB(255, 205, 50), material = Enum.Material.SmoothPlastic },
+	Circuit = { color = Color3.fromRGB(0, 200, 100), material = Enum.Material.SmoothPlastic },
+	ReinforcedPlate = { color = Color3.fromRGB(90, 100, 110), material = Enum.Material.DiamondPlate },
 }
 
 local DEFAULT_STYLE = { color = Color3.fromRGB(255, 255, 255), material = Enum.Material.SmoothPlastic }
@@ -41,6 +43,7 @@ local LOCAL_OFFSETS = {
 	[4] = Vector3.new(0, 0.75, -1.5),
 }
 
+-- 0° -> -Z, 90° -> +X, 180° -> +Z, 270° -> -X (Matching Roblox CFrame.Angles(0, rad(deg), 0))
 local function getDirectionOffset(orientation: number): Vector3int16
 	if orientation == 0 then
 		return Vector3int16.new(0, 0, -1)
@@ -135,7 +138,6 @@ function ItemVisualController.OnSyncConveyorItems(payload: { ConveyorItemSyncPay
 
 		if not visual then
 			visual = getPartFromPool()
-			-- Start newly occupied slot's visual part at the previous slot position so it lerps smoothly!
 			local startPos = calculatePreviousSlotWorldPosition(item.coord, item.slotIndex, item.orientation)
 			visual.part.CFrame = CFrame.new(startPos)
 			visual.targetPosition = targetPos
@@ -163,7 +165,6 @@ function ItemVisualController.OnSyncConveyorItems(payload: { ConveyorItemSyncPay
 end
 
 function ItemVisualController.OnRenderStepped(dt: number)
-	-- Smooth frame-rate independent interpolation towards target position
 	local lerpFactor = math.clamp(dt * 18, 0, 1)
 	for _, visual in pairs(activeVisuals) do
 		if visual.inUse then

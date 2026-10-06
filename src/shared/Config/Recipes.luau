@@ -51,6 +51,32 @@ local Recipes: { [string]: Types.Recipe } = {
 		craftDuration = 2.0,
 		machineType = "Assembler",
 	},
+	Circuit = {
+		id = "Circuit",
+		displayName = "Craft Circuit",
+		inputs = {
+			IronPlate = 1,
+			Wire = 2,
+		},
+		outputs = {
+			Circuit = 1,
+		},
+		craftDuration = 3.0,
+		machineType = "Assembler",
+	},
+	ReinforcedPlate = {
+		id = "ReinforcedPlate",
+		displayName = "Craft Reinforced Plate",
+		inputs = {
+			IronIngot = 2,
+			CopperIngot = 1,
+		},
+		outputs = {
+			ReinforcedPlate = 1,
+		},
+		craftDuration = 4.0,
+		machineType = "Assembler",
+	},
 }
 
 return table.freeze(Recipes)

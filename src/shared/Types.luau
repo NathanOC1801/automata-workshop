@@ -1,6 +1,6 @@
 --!strict
 
-export type ItemId = "RawIron" | "RawCopper" | "IronIngot" | "CopperIngot" | "IronPlate" | "Wire"
+export type ItemId = "RawIron" | "RawCopper" | "IronIngot" | "CopperIngot" | "IronPlate" | "Wire" | "Circuit" | "ReinforcedPlate"
 
 export type ItemData = {
 	id: ItemId,

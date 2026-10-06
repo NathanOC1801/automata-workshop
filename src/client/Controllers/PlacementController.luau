@@ -20,7 +20,6 @@ local selectedCategory: Types.MachineCategory = "Conveyor"
 local orientation = 0 -- 0, 90, 180, 270
 
 local ghostPart: Part? = nil
-local surfaceGui: SurfaceGui? = nil
 local currentGridCoord: Vector3int16? = nil
 local isCellVacant = true
 
@@ -42,13 +41,6 @@ local function updateGhostAppearance()
 	end
 	local size, _ = getGhostSizeAndOffset(selectedCategory)
 	ghostPart.Size = size
-	if surfaceGui then
-		local label = surfaceGui:FindFirstChildOfClass("TextLabel")
-		if label then
-			label.Text = selectedCategory == "Sink" and "▼" or "▲"
-			label.TextColor3 = selectedCategory == "Sink" and Color3.fromRGB(255, 120, 0) or Color3.fromRGB(255, 255, 255)
-		end
-	end
 end
 
 local function createGhostPart(): Part
@@ -63,21 +55,6 @@ local function createGhostPart(): Part
 	part.Transparency = 0.5
 	part.Material = Enum.Material.SmoothPlastic
 	part.Color = Color3.fromRGB(0, 255, 0)
-
-	local gui = Instance.new("SurfaceGui")
-	gui.Face = Enum.NormalId.Top
-	gui.Parent = part
-	surfaceGui = gui
-
-	local arrowLabel = Instance.new("TextLabel")
-	arrowLabel.Size = UDim2.fromScale(1, 1)
-	arrowLabel.BackgroundTransparency = 1
-	arrowLabel.Text = selectedCategory == "Sink" and "▼" or "▲"
-	arrowLabel.TextColor3 = selectedCategory == "Sink" and Color3.fromRGB(255, 120, 0) or Color3.fromRGB(255, 255, 255)
-	arrowLabel.TextScaled = true
-	arrowLabel.Font = Enum.Font.SourceSansBold
-	arrowLabel.Parent = gui
-
 	part.Parent = Workspace
 	return part
 end
@@ -86,7 +63,6 @@ local function destroyGhostPart()
 	if ghostPart then
 		ghostPart:Destroy()
 		ghostPart = nil
-		surfaceGui = nil
 	end
 end
 
@@ -110,7 +86,7 @@ function PlacementController.TogglePlacementMode()
 	isPlacementActive = not isPlacementActive
 	if isPlacementActive then
 		ghostPart = createGhostPart()
-		print("[PlacementController] Placement mode enabled. Keys 1=Conveyor, 2=Drill, 3=Smelter, 4=Splitter, 5=Merger, 6=Storage, 7=Sink. Right-Click/X=Demolish. 'R'=Rotate, 'E'=Toggle.")
+		print("[PlacementController] Placement mode enabled. Keys 1=Conveyor, 2=Drill, 3=Smelter, 4=Splitter, 5=Merger, 6=Storage, 7=Sink, 8=Assembler. Right-Click/X=Demolish. 'R'=Rotate, 'E'=Toggle.")
 	else
 		destroyGhostPart()
 		print("[PlacementController] Placement mode disabled.")
@@ -155,6 +131,8 @@ function PlacementController.OnInputBegan(input: InputObject, gameProcessed: boo
 		PlacementController.SelectCategory("Storage")
 	elseif input.KeyCode == Enum.KeyCode.Seven then
 		PlacementController.SelectCategory("Sink")
+	elseif input.KeyCode == Enum.KeyCode.Eight then
+		PlacementController.SelectCategory("Assembler")
 	elseif input.UserInputType == Enum.UserInputType.MouseButton1 then
 		if isPlacementActive and currentGridCoord and isCellVacant then
 			Network.Remotes.PlaceObject:FireServer(currentGridCoord, selectedCategory, orientation)
@@ -173,7 +151,7 @@ function PlacementController.OnRenderStepped()
 
 	local ray = mouse.UnitRay
 	local raycastParams = RaycastParams.new()
-	raycastParams.FilterType = RaycastFilterType.Exclude
+	raycastParams.FilterType = Enum.RaycastFilterType.Exclude
 	if ghostPart then
 		raycastParams.FilterDescendantsInstances = { ghostPart }
 	end
@@ -197,15 +175,9 @@ function PlacementController.OnRenderStepped()
 			ghostPart.Color = Color3.fromRGB(255, 0, 0)
 		end
 		ghostPart.Transparency = 0.5
-		if surfaceGui then
-			surfaceGui.Enabled = true
-		end
 	else
 		currentGridCoord = nil
 		ghostPart.Transparency = 1.0
-		if surfaceGui then
-			surfaceGui.Enabled = false
-		end
 	end
 end
 
