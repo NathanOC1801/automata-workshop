@@ -53,20 +53,71 @@ local function spawnFloatingText(amount: number)
 	end)
 end
 
+local function createHeaderButton(parent: Instance, text: string, layoutOrder: number, color: Color3, onClick: () -> ()): TextButton
+	local btn = Instance.new("TextButton")
+	btn.Name = text .. "Button"
+	btn.Size = UDim2.new(0, 90, 0, 42)
+	btn.BackgroundColor3 = Color3.fromRGB(25, 28, 32)
+	btn.BorderSizePixel = 0
+	btn.Text = text
+	btn.TextColor3 = color
+	btn.TextSize = 15
+	btn.Font = Enum.Font.SourceSansBold
+	btn.LayoutOrder = layoutOrder
+	btn.Parent = parent
+
+	local corner = Instance.new("UICorner")
+	corner.CornerRadius = UDim.new(0, 8)
+	corner.Parent = btn
+
+	local stroke = Instance.new("UIStroke")
+	stroke.Color = Color3.fromRGB(50, 55, 65)
+	stroke.Thickness = 1.5
+	stroke.Parent = btn
+
+	btn.MouseButton1Click:Connect(onClick)
+	return btn
+end
+
 local function createHUD()
 	screenGui = Instance.new("ScreenGui")
 	screenGui.Name = "FactoryUnifiedHUD"
 	screenGui.ResetOnSpawn = false
 
-	-- Top Right Credits Balance Bar
+	-- Top Right Header Container (Planets -> Shop -> Credits)
+	local topBarContainer = Instance.new("Frame")
+	topBarContainer.Name = "TopBarContainer"
+	topBarContainer.Size = UDim2.new(0, 380, 0, 42)
+	topBarContainer.Position = UDim2.new(1, -20, 0, 16)
+	topBarContainer.AnchorPoint = Vector2.new(1, 0)
+	topBarContainer.BackgroundTransparency = 1
+	topBarContainer.Parent = screenGui
+
+	local listLayout = Instance.new("UIListLayout")
+	listLayout.FillDirection = Enum.FillDirection.Horizontal
+	listLayout.HorizontalAlignment = Enum.HorizontalAlignment.Right
+	listLayout.VerticalAlignment = Enum.VerticalAlignment.Center
+	listLayout.Padding = UDim.new(0, 10)
+	listLayout.Parent = topBarContainer
+
+	-- 1. [Planets] Button
+	createHeaderButton(topBarContainer, "[Planets]", 1, Color3.fromRGB(0, 200, 255), function()
+		print("[HUDController] Toggle Planets Modal")
+	end)
+
+	-- 2. [Shop] Button
+	createHeaderButton(topBarContainer, "[Shop]", 2, Color3.fromRGB(255, 205, 50), function()
+		print("[HUDController] Toggle Shop Modal")
+	end)
+
+	-- 3. [Credits] Pill Card
 	local creditsCard = Instance.new("Frame")
 	creditsCard.Name = "CreditsCard"
-	creditsCard.Size = UDim2.new(0, 180, 0, 42)
-	creditsCard.Position = UDim2.new(1, -20, 0, 16)
-	creditsCard.AnchorPoint = Vector2.new(1, 0)
+	creditsCard.Size = UDim2.new(0, 160, 0, 42)
 	creditsCard.BackgroundColor3 = Color3.fromRGB(25, 28, 32)
 	creditsCard.BorderSizePixel = 0
-	creditsCard.Parent = screenGui
+	creditsCard.LayoutOrder = 3
+	creditsCard.Parent = topBarContainer
 
 	local cCorner = Instance.new("UICorner")
 	cCorner.CornerRadius = UDim.new(0, 8)
@@ -83,7 +134,7 @@ local function createHUD()
 	cText.BackgroundTransparency = 1
 	cText.Text = "Credits: $250"
 	cText.TextColor3 = Color3.fromRGB(85, 255, 127)
-	cText.TextSize = 20
+	cText.TextSize = 18
 	cText.Font = Enum.Font.SourceSansBold
 	cText.Parent = creditsCard
 	creditsLabel = cText
