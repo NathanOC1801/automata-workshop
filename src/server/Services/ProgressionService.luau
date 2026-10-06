@@ -38,10 +38,32 @@ function ProgressionService.SetProgression(player: Player, tier: number, sunkIte
 	if sunkItems then
 		data.sunkItems = sunkItems
 	end
+	ProgressionService.SendMilestoneProgress(player)
 end
 
 function ProgressionService.GetSunkItems(player: Player): { [string]: number }
 	return getPlayerData(player).sunkItems
+end
+
+function ProgressionService.SendMilestoneProgress(player: Player)
+	local data = getPlayerData(player)
+	local currentTier = data.unlockedTier
+	local nextTier = currentTier + 1
+	local milestone = Milestones[nextTier]
+
+	local credits = EconomyService.GetCredits(player)
+
+	local payload = {
+		currentTier = currentTier,
+		nextTier = nextTier,
+		milestoneName = milestone and milestone.name or "Max Tier Reached",
+		requiredCredits = milestone and milestone.requirement.credits or 0,
+		currentCredits = credits,
+		requiredItems = milestone and milestone.requirement.items or {},
+		sunkItems = data.sunkItems,
+	}
+
+	Network.Remotes.MilestoneProgressUpdated:FireClient(player, payload)
 end
 
 local function checkMilestoneCompletion(player: Player)
@@ -51,17 +73,20 @@ local function checkMilestoneCompletion(player: Player)
 	local milestone = Milestones[nextTier]
 
 	if not milestone then
+		ProgressionService.SendMilestoneProgress(player)
 		return
 	end
 
 	local credits = EconomyService.GetCredits(player)
 	if credits < milestone.requirement.credits then
+		ProgressionService.SendMilestoneProgress(player)
 		return
 	end
 
 	for itemId, requiredCount in pairs(milestone.requirement.items) do
 		local sunkCount = data.sunkItems[itemId] or 0
 		if sunkCount < requiredCount then
+			ProgressionService.SendMilestoneProgress(player)
 			return
 		end
 	end
@@ -75,6 +100,7 @@ local function checkMilestoneCompletion(player: Player)
 	print(string.format("[ProgressionService] Player %s unlocked Tier %d: %s!", player.Name, nextTier, milestone.name))
 
 	Network.Remotes.MilestoneUnlocked:FireClient(player, nextTier, milestone.name)
+	ProgressionService.SendMilestoneProgress(player)
 end
 
 function ProgressionService.ProcessSinkConsumption(player: Player, itemId: string)
@@ -86,6 +112,9 @@ end
 function ProgressionService.Init()
 	Players.PlayerAdded:Connect(function(player)
 		getPlayerData(player)
+		task.delay(1, function()
+			ProgressionService.SendMilestoneProgress(player)
+		end)
 	end)
 end
 
