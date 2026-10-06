@@ -132,7 +132,7 @@ local function createInspectionUI()
 	fillCorner.Parent = fill
 	progressBarFill = fill
 
-	-- Recipe Selector Container
+	-- Recipe / Option Selector Container
 	local recFrame = Instance.new("Frame")
 	recFrame.Name = "RecipeContainer"
 	recFrame.Size = UDim2.new(1, -30, 0, 80)
@@ -143,6 +143,61 @@ local function createInspectionUI()
 
 	frame = main
 	screenGui.Parent = playerGui
+end
+
+local function populateDrillButtons(coord: Vector3int16)
+	if not recipeFrame then
+		return
+	end
+	for _, child in ipairs(recipeFrame:GetChildren()) do
+		child:Destroy()
+	end
+
+	local title = Instance.new("TextLabel")
+	title.Size = UDim2.new(1, 0, 0, 20)
+	title.BackgroundTransparency = 1
+	title.Text = "Select Resource Mode:"
+	title.TextColor3 = Color3.fromRGB(220, 220, 220)
+	title.TextSize = 14
+	title.Font = Enum.Font.SourceSansBold
+	title.TextXAlignment = Enum.TextXAlignment.Left
+	title.Parent = recipeFrame
+
+	local ironBtn = Instance.new("TextButton")
+	ironBtn.Size = UDim2.new(0.48, 0, 0, 30)
+	ironBtn.Position = UDim2.new(0, 0, 0, 25)
+	ironBtn.BackgroundColor3 = Color3.fromRGB(115, 115, 115)
+	ironBtn.Text = "Iron Ore"
+	ironBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+	ironBtn.TextSize = 14
+	ironBtn.Font = Enum.Font.SourceSansBold
+	ironBtn.Parent = recipeFrame
+
+	local btnCorner1 = Instance.new("UICorner")
+	btnCorner1.CornerRadius = UDim.new(0, 4)
+	btnCorner1.Parent = ironBtn
+
+	ironBtn.MouseButton1Click:Connect(function()
+		Network.Remotes.SetMachineRecipe:FireServer(coord, "RawIron")
+	end)
+
+	local copperBtn = Instance.new("TextButton")
+	copperBtn.Size = UDim2.new(0.48, 0, 0, 30)
+	copperBtn.Position = UDim2.new(0.52, 0, 0, 25)
+	copperBtn.BackgroundColor3 = Color3.fromRGB(184, 115, 51)
+	copperBtn.Text = "Copper Ore"
+	copperBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+	copperBtn.TextSize = 14
+	copperBtn.Font = Enum.Font.SourceSansBold
+	copperBtn.Parent = recipeFrame
+
+	local btnCorner2 = Instance.new("UICorner")
+	btnCorner2.CornerRadius = UDim.new(0, 4)
+	btnCorner2.Parent = copperBtn
+
+	copperBtn.MouseButton1Click:Connect(function()
+		Network.Remotes.SetMachineRecipe:FireServer(coord, "RawCopper")
+	end)
 end
 
 local function populateRecipeButtons(coord: Vector3int16)
@@ -194,33 +249,41 @@ function InspectionController.InspectMachineAt(coord: Vector3int16)
 	if state and frame and titleLabel and statusLabel and inputBufferLabel and progressBarFill then
 		currentInspectedCoord = coord
 		titleLabel.Text = string.format("%s Inspection", state.category)
-		statusLabel.Text = string.format("Status: %s (Recipe: %s)", state.status, state.recipe)
 
-		local inputStr = "Inputs: "
-		if state.inputBuffer then
-			local itemsList = {}
-			for itemId, count in pairs(state.inputBuffer) do
-				if count > 0 then
-					table.insert(itemsList, string.format("%s: %d", itemId, count))
+		if state.category == "Drill" then
+			local resourceName = state.selectedResource == "RawCopper" and "Raw Copper" or "Raw Iron"
+			statusLabel.Text = string.format("Current Resource: Mining %s", resourceName)
+			inputBufferLabel.Text = "Mode: Automatic Extraction"
+			populateDrillButtons(coord)
+		else
+			statusLabel.Text = string.format("Status: %s (Recipe: %s)", state.status, state.recipe)
+
+			local inputStr = "Inputs: "
+			if state.inputBuffer then
+				local itemsList = {}
+				for itemId, count in pairs(state.inputBuffer) do
+					if count > 0 then
+						table.insert(itemsList, string.format("%s: %d", itemId, count))
+					end
+				end
+				if #itemsList > 0 then
+					inputStr = inputStr .. table.concat(itemsList, ", ")
+				else
+					inputStr = inputStr .. "Empty"
 				end
 			end
-			if #itemsList > 0 then
-				inputStr = inputStr .. table.concat(itemsList, ", ")
-			else
-				inputStr = inputStr .. "Empty"
+			inputBufferLabel.Text = inputStr
+
+			if state.category == "Assembler" and #recipeFrame:GetChildren() == 0 then
+				populateRecipeButtons(coord)
+			elseif state.category ~= "Assembler" and recipeFrame then
+				for _, child in ipairs(recipeFrame:GetChildren()) do
+					child:Destroy()
+				end
 			end
 		end
-		inputBufferLabel.Text = inputStr
+
 		progressBarFill.Size = UDim2.new(state.progress or 0, 0, 1, 0)
-
-		if state.category == "Assembler" and #recipeFrame:GetChildren() == 0 then
-			populateRecipeButtons(coord)
-		elseif state.category ~= "Assembler" and recipeFrame then
-			for _, child in ipairs(recipeFrame:GetChildren()) do
-				child:Destroy()
-			end
-		end
-
 		frame.Visible = true
 	end
 end

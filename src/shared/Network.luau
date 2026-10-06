@@ -60,6 +60,7 @@ local syncCreditsRemote = getOrCreateRemoteEvent("SyncCredits", remotesFolder)
 local milestoneUnlockedRemote = getOrCreateRemoteEvent("MilestoneUnlocked", remotesFolder)
 local milestoneProgressUpdatedRemote = getOrCreateRemoteEvent("MilestoneProgressUpdated", remotesFolder)
 local selectRecipeRemote = getOrCreateRemoteEvent("SelectRecipe", remotesFolder)
+local setMachineRecipeRemote = getOrCreateRemoteEvent("SetMachineRecipe", remotesFolder)
 
 local getMachineStateFunction = getOrCreateRemoteFunction("GetMachineState", remotesFolder)
 
@@ -71,6 +72,7 @@ Network.Remotes = {
 	MilestoneUnlocked = milestoneUnlockedRemote,
 	MilestoneProgressUpdated = milestoneProgressUpdatedRemote,
 	SelectRecipe = selectRecipeRemote,
+	SetMachineRecipe = setMachineRecipeRemote,
 	GetMachineState = getMachineStateFunction,
 }
 
