@@ -1,13 +1,16 @@
 --!strict
 
 local Workspace = game:GetService("Workspace")
+local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
+local MarketplaceService = game:GetService("MarketplaceService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Types = require(ReplicatedStorage.Shared.Types)
 local GridMath = require(ReplicatedStorage.Shared.Utility.GridMath)
 local Network = require(ReplicatedStorage.Shared.Network)
+local MonetizationConfig = require(ReplicatedStorage.Shared.Config.Monetization)
 
 export type ConveyorItemSyncPayload = {
 	coord: Vector3int16,
@@ -25,24 +28,41 @@ type ItemVisualData = {
 local ItemVisualController = {}
 
 local ITEM_STYLES: { [string]: { color: Color3, material: Enum.Material } } = {
+	-- Ores
 	RawIron = { color = Color3.fromRGB(115, 115, 115), material = Enum.Material.Slate },
 	RawCopper = { color = Color3.fromRGB(184, 115, 51), material = Enum.Material.Slate },
+	RawTitanium = { color = Color3.fromRGB(180, 190, 200), material = Enum.Material.Slate },
+	RawCobalt = { color = Color3.fromRGB(30, 70, 160), material = Enum.Material.Slate },
+	RawGold = { color = Color3.fromRGB(220, 180, 40), material = Enum.Material.Slate },
+	RawEmerald = { color = Color3.fromRGB(10, 180, 80), material = Enum.Material.Glass },
+	RawDiamond = { color = Color3.fromRGB(120, 220, 255), material = Enum.Material.Glass },
+	RawUranium = { color = Color3.fromRGB(80, 230, 50), material = Enum.Material.Neon },
+
+	-- Processed Materials
 	IronIngot = { color = Color3.fromRGB(200, 200, 205), material = Enum.Material.Metal },
 	CopperIngot = { color = Color3.fromRGB(220, 130, 60), material = Enum.Material.Metal },
+	TitaniumIngot = { color = Color3.fromRGB(190, 200, 215), material = Enum.Material.Metal },
+	CobaltIngot = { color = Color3.fromRGB(40, 90, 210), material = Enum.Material.Metal },
+	GoldBar = { color = Color3.fromRGB(255, 215, 0), material = Enum.Material.Metal },
+	CutEmerald = { color = Color3.fromRGB(0, 255, 120), material = Enum.Material.Neon },
+	PolishedDiamond = { color = Color3.fromRGB(180, 240, 255), material = Enum.Material.Glass },
+
+	-- Components
 	IronPlate = { color = Color3.fromRGB(160, 165, 170), material = Enum.Material.CorrodedMetal },
 	Wire = { color = Color3.fromRGB(255, 205, 50), material = Enum.Material.SmoothPlastic },
 	Circuit = { color = Color3.fromRGB(0, 200, 100), material = Enum.Material.SmoothPlastic },
 	ReinforcedPlate = { color = Color3.fromRGB(90, 100, 110), material = Enum.Material.DiamondPlate },
+	TitaniumFrame = { color = Color3.fromRGB(140, 160, 185), material = Enum.Material.Metal },
+	SolarCell = { color = Color3.fromRGB(20, 30, 70), material = Enum.Material.SmoothPlastic },
 }
 
 local DEFAULT_STYLE = { color = Color3.fromRGB(255, 255, 255), material = Enum.Material.SmoothPlastic }
 
--- Item Y offset = conveyorTopY (1.0) + itemHalfHeight (0.4) + clearance (0.15) = 1.55 studs
 local LOCAL_OFFSETS = {
-	[1] = Vector3.new(0, 1.55, 1.5),
-	[2] = Vector3.new(0, 1.55, 0.5),
-	[3] = Vector3.new(0, 1.55, -0.5),
-	[4] = Vector3.new(0, 1.55, -1.5),
+	[1] = Vector3.new(0, 0.75, 1.5),
+	[2] = Vector3.new(0, 0.75, 0.5),
+	[3] = Vector3.new(0, 0.75, -0.5),
+	[4] = Vector3.new(0, 0.75, -1.5),
 }
 
 -- 0° -> -Z, 90° -> -X, 180° -> +Z, 270° -> +X (Matching Roblox CFrame.Angles(0, rad(deg), 0))
@@ -58,6 +78,20 @@ local function getDirectionOffset(orientation: number): Vector3int16
 	else
 		return Vector3int16.new(0, 0, -1)
 	end
+end
+
+local player = Players.LocalPlayer
+local isDoubleConveyorSpeedOwned = false
+
+local function checkPassOwnership()
+	task.spawn(function()
+		local success, owns = pcall(function()
+			return MarketplaceService:UserOwnsGamePassAsync(player.UserId, MonetizationConfig.DoubleConveyorSpeedPassId)
+		end)
+		if success and owns then
+			isDoubleConveyorSpeedOwned = true
+		end
+	end)
 end
 
 local partPool: { ItemVisualData } = {}
@@ -79,7 +113,7 @@ local itemFolder = getOrCreateItemFolder()
 local function calculateSlotWorldPosition(coord: Vector3int16, slotIndex: number, orientation: number): Vector3
 	local tileCenter = GridMath.gridToWorld(coord)
 	local conveyorCFrame = CFrame.new(tileCenter) * CFrame.Angles(0, math.rad(orientation), 0)
-	local offset = LOCAL_OFFSETS[slotIndex] or Vector3.new(0, 1.55, 0)
+	local offset = LOCAL_OFFSETS[slotIndex] or Vector3.new(0, 0.75, 0)
 	return (conveyorCFrame * CFrame.new(offset)).Position
 end
 
@@ -91,47 +125,6 @@ local function calculatePreviousSlotWorldPosition(coord: Vector3int16, slotIndex
 		local dirOffset = getDirectionOffset(orientation)
 		local prevCoord = Vector3int16.new(coord.X - dirOffset.X, coord.Y - dirOffset.Y, coord.Z - dirOffset.Z)
 		return calculateSlotWorldPosition(prevCoord, 4, orientation)
-	end
-end
-
-local function triggerSmelterPulse(coord: Vector3int16)
-	local placedFolder = Workspace:FindFirstChild("PlacedObjects")
-	if not placedFolder then
-		return
-	end
-	local name = string.format("Smelter_%d_%d_%d", coord.X, coord.Y, coord.Z)
-	local part = placedFolder:FindFirstChild(name)
-	if part then
-		local light = part:FindFirstChild("FurnaceLight")
-		if light and light:IsA("PointLight") then
-			local pulseUp = TweenService:Create(light, TweenInfo.new(0.15), { Brightness = 5 })
-			local pulseDown = TweenService:Create(light, TweenInfo.new(0.15), { Brightness = 0 })
-			pulseUp:Play()
-			pulseUp.Completed:Connect(function()
-				pulseDown:Play()
-			end)
-		end
-	end
-end
-
-local function triggerDrillSquash(coord: Vector3int16)
-	local placedFolder = Workspace:FindFirstChild("PlacedObjects")
-	if not placedFolder then
-		return
-	end
-	local name = string.format("Drill_%d_%d_%d", coord.X, coord.Y, coord.Z)
-	local part = placedFolder:FindFirstChild(name)
-	if part and part:IsA("BasePart") then
-		local originalSize = Vector3.new(4, 4, 4)
-		local squashSize = Vector3.new(4.2, 3.6, 4.2)
-
-		local squashTween = TweenService:Create(part, TweenInfo.new(0.12, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), { Size = squashSize })
-		local restoreTween = TweenService:Create(part, TweenInfo.new(0.12, Enum.EasingStyle.Quad, Enum.EasingDirection.In), { Size = originalSize })
-
-		squashTween:Play()
-		squashTween.Completed:Connect(function()
-			restoreTween:Play()
-		end)
 	end
 end
 
@@ -162,6 +155,12 @@ local function getPartFromPool(): ItemVisualData
 	}
 	table.insert(partPool, newEntry)
 	return newEntry
+end
+
+local function releasePartToPool(entry: ItemVisualData)
+	entry.inUse = false
+	entry.part.Transparency = 1
+	entry.part.CFrame = CFrame.new(0, -1000, 0)
 end
 
 local function fadeAndReleasePart(entry: ItemVisualData)
@@ -198,12 +197,6 @@ function ItemVisualController.OnSyncConveyorItems(payload: { ConveyorItemSyncPay
 			visual.part.Material = style.material
 
 			activeVisuals[key] = visual
-
-			-- Trigger machine flourishes
-			if item.slotIndex == 1 then
-				triggerDrillSquash(item.coord)
-				triggerSmelterPulse(item.coord)
-			end
 		else
 			visual.targetPosition = targetPos
 			local style = ITEM_STYLES[item.itemId] or DEFAULT_STYLE
@@ -222,8 +215,8 @@ function ItemVisualController.OnSyncConveyorItems(payload: { ConveyorItemSyncPay
 end
 
 function ItemVisualController.OnRenderStepped(dt: number)
-	-- Smooth frame-by-frame CFrame lerp interpolation (dt * 14) with subtle mechanical settling bob
-	local lerpFactor = math.clamp(dt * 14, 0, 1)
+	local speedMult = isDoubleConveyorSpeedOwned and 2.0 or 1.0
+	local lerpFactor = math.clamp(dt * 14 * speedMult, 0, 1)
 	for _, visual in pairs(activeVisuals) do
 		if visual.inUse then
 			local currentPos = visual.part.Position
@@ -235,6 +228,8 @@ function ItemVisualController.OnRenderStepped(dt: number)
 end
 
 function ItemVisualController.Init()
+	checkPassOwnership()
+
 	Network.Remotes.SyncConveyorItems.OnClientEvent:Connect(function(payload)
 		if typeof(payload) == "table" then
 			ItemVisualController.OnSyncConveyorItems(payload)
